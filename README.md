@@ -8,8 +8,9 @@ A driving game. You are the **green** company's lorry, racing **blue**, **yellow
 - Customers post requests (💬). Drive to their door before the rivals get there.
 - When you arrive, pick an offer within 5 seconds: **Standard price**, **Discount**, or **Trade marketing** (free safety check, promo banner and loyalty card, which keeps the customer loyal).
 - Every order has a quantity (for example 4×C50). You need at least that many on board to make the sale.
-- Deliver 📦 reorders to your own customers on time, or they start looking for another supplier.
-- Your lorry holds 30 cylinders. When you run low, park at the LPG terminal and buy more with your cash. Rival lorries buy there with their own cash too.
+- Bubbles: **YOUR ORDER** (green) = your own customer needs gas, deliver before the timer runs out · **NEW** (white) = customer with no supplier · **GRAB IT!** (orange) = customer unhappy with their supplier, anyone can win them. If you're late with YOUR ORDER, it turns into GRAB IT!
+- The **My Customers' Orders** bar lists your waiting orders with time left and whether you have the stock. Tap one to drive there.
+- Your lorry holds 50 cylinders. When you run low, park at the LPG terminal and buy more with your cash. Rival lorries buy there with their own cash too.
 - The **My Lorry** bar shows your current cash and stock. The team bar shows every company's cash, customers and stock.
 - Cylinder colours: **C14** green (subsidised, households only), **C14C** purple, **C50** white, **F14** silver.
 - Final score = cash + stock left on the lorry (at terminal price) + RM100 per customer.
