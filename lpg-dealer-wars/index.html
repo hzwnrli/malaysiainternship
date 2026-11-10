@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LPG Dealer Wars</title>
+<style>
+:root{
+  --bg:#0d1b1e; --panel:#13282c; --panel2:#1a3439; --ink:#e8f3f2; --muted:#9fb8b6;
+  --you:#00a19c; --you-soft:rgba(0,161,156,.18); --good:#4ade80; --bad:#f87171; --warn:#fbbf24;
+  --line:#26464b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 12px;background:var(--panel2);color:var(--ink)}
+button:hover:not(:disabled){filter:brightness(1.2)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--you);color:#fff;font-weight:700}
+button.danger{background:#7f1d1d;color:#fff}
+h1,h2,h3{margin:0 0 8px}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header .brand{font-weight:800;font-size:16px;margin-right:auto;color:var(--you)}
+.stat{background:var(--panel2);padding:4px 10px;border-radius:8px;white-space:nowrap}
+.stat b{color:#fff}
+#eventBar{padding:6px 16px;background:#3a2f0b;color:var(--warn);display:none}
+main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;padding:12px 16px 90px;max-width:1300px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+#map{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+@media (max-width:600px){#map{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.tile{position:relative;background:var(--panel);border:3px solid #3a5257;border-radius:10px;padding:4px;min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .1s}
+.tile:hover{transform:scale(1.04)}
+.tile.sel{outline:3px solid #fff;outline-offset:1px}
+.tile .ic{font-size:26px;line-height:1}
+.tile .lbl{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
+.tile .sat{position:absolute;left:4px;right:4px;bottom:3px;height:4px;background:#0006;border-radius:2px;overflow:hidden}
+.tile .sat i{display:block;height:100%}
+.tile .badge{position:absolute;top:2px;right:4px;font-size:11px}
+.tile .owner{position:absolute;top:2px;left:4px;font-size:9px;font-weight:700;padding:0 4px;border-radius:4px;color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;color:var(--muted);font-size:12px}
+.legend span i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.chip{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;margin:2px 4px 2px 0;background:var(--panel2)}
+.chip.sub{background:#1e3a8a;color:#dbeafe}
+.chip.com{background:#065f46;color:#d1fae5}
+.chip.miss{background:#7f1d1d;color:#fee2e2}
+.offer{display:block;width:100%;text-align:left;margin:6px 0;padding:10px}
+.offer small{display:block;color:var(--muted);font-weight:400}
+.offer.illegal{border:1px dashed var(--bad)}
+.tabs{display:flex;gap:4px;margin-bottom:8px}
+.tabs button{flex:1}
+.tabs button.on{background:var(--you)}
+.upg{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.upg small{color:var(--muted);display:block}
+#log{max-height:320px;overflow:auto;font-size:12px}
+#log div{padding:3px 0;border-bottom:1px solid #ffffff10}
+.good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)} .muted{color:var(--muted)}
+footer{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:5}
+footer .hint{color:var(--muted);font-size:12px}
+.overlay{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.hidden{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:20px}
+.modal table{width:100%;border-collapse:collapse;font-size:13px}
+.modal td,.modal th{padding:5px;border-bottom:1px solid var(--line);text-align:left}
+.bar{height:10px;background:#0006;border-radius:5px;overflow:hidden;margin:4px 0}
+.bar i{display:block;height:100%;background:var(--you)}
+#toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#000d;padding:10px 16px;border-radius:10px;z-index:30;display:none;max-width:90vw;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">⛽ LPG Dealer Wars</div>
+  <div class="stat">📅 Day <b id="sDay">1</b>/<span id="sMax">30</span></div>
+  <div class="stat">💰 RM <b id="sCash">0</b></div>
+  <div class="stat">🚶 Visits <b id="sVisits">0</b></div>
+  <div class="stat">🚚 Load <b id="sLoad">0</b></div>
+  <div class="stat">⭐ Rep <b id="sRep">0</b></div>
+  <div class="stat">📊 Share <b id="sShare">0%</b></div>
+</header>
+<div id="eventBar"></div>
+
+<main>
+  <section>
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+    <div class="card muted" style="font-size:12px">
+      <b class="good">Products:</b>
+      <span class="chip sub">C14</span> subsidised 14kg – <b>households only</b> ·
+      <span class="chip com">C14C</span> commercial 14kg ·
+      <span class="chip com">C50</span> commercial 50kg ·
+      <span class="chip com">F14</span> forklift 14kg ·
+      <span class="chip com">BULK</span> bulk LPG by road tanker.
+      <br>Game numbers are simplified for play and are not real prices.
+    </div>
+  </section>
+  <aside>
+    <div class="card" id="panel"><h3>Select a customer</h3><p class="muted">Tap a building on the map to see who supplies them and make your pitch.</p></div>
+    <div class="card">
+      <div class="tabs">
+        <button data-tab="upg" class="on">Upgrades</button>
+        <button data-tab="riv">Dealers</button>
+        <button data-tab="log">Log</button>
+      </div>
+      <div id="tab"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <span class="hint" id="hint">Pitch customers, then end the day to deliver gas.</span>
+  <button class="primary" id="endDay">End Day ▶</button>
+</footer>
+
+<div class="overlay" id="modalWrap"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script>
+// ---------- DATA ----------
+const PRODUCTS = {
+  C14:  {name:'C14',  kind:'sub', full:'14kg cylinder – Subsidised (household cooking only)'},
+  C14C: {name:'C14C', kind:'com', full:'14kg cylinder – Commercial (unsubsidised)'},
+  C50:  {name:'C50',  kind:'com', full:'50kg cylinder – Commercial (unsubsidised)'},
+  F14:  {name:'F14',  kind:'com', full:'14kg Forklift cylinder (unsubsidised)'},
+  BULK: {name:'BULK', kind:'com', full:'Bulk LPG – delivered by road tanker into customer storage tank'},
+};
+const SEG = {
+  household:  {name:'Household',        icon:'🏠', prod:['C14'],              load:1, profit:8,   orderP:.55, base:58, pitch:30,  n:16},
+  restaurant: {name:'Restaurant',       icon:'🍜', prod:['C14C','C50'],       load:2, profit:40,  orderP:.85, base:46, pitch:80,  n:9},
+  lobby:      {name:'Lobby / Café',     icon:'☕', prod:['C14C'],             load:1, profit:20,  orderP:.75, base:50, pitch:50,  n:6},
+  hotel:      {name:'Hotel',            icon:'🏨', prod:['C50','BULK'],       load:3, profit:95,  orderP:.85, base:36, pitch:200, n:5},
+  mall:       {name:'Hospitality Mall', icon:'🏬', prod:['BULK','C50'],       load:4, profit:145, orderP:.9,  base:30, pitch:300, n:4},
+  factory:    {name:'Manufacturing',    icon:'🏭', prod:['BULK','F14','C50'], load:4, profit:175, orderP:.9,  base:28, pitch:350, n:8},
+};
+const NAMES = {
+  household:['Taman Melur','Taman Sri Muda','Kg. Baru','Taman Bukit Indah','Taman Seroja','Desa Aman','Taman Cempaka','Kg. Padang','Taman Mawar','Bandar Baru','Taman Orkid','Taman Dahlia','Kg. Sungai Ara','Taman Bayu','Taman Kasturi','Desa Jaya'],
+  restaurant:['Restoran Selera Kampung','Kedai Makan Mak Long','Restoran Ah Seng','Warung Tomyam Cik Nah','Restoran Mamak Bistari','Kopitiam Lama','Dapur Briyani Raja','Restoran Seafood Pantai','Gerai Satay Haji Ali'],
+  lobby:['Menara Cempaka Lobby Café','Wisma Delima Café','Plaza Kenanga Bistro','Kafe Lobi Seri Mutiara','Lobby Kopi Corner','Café Lobi Teratai'],
+  hotel:['Hotel Seri Pantai','Grand Melati Hotel','Hotel Puncak Indah','Bayu Resort & Spa','Hotel Kenari Inn'],
+  mall:['Mutiara City Mall','Galeria Sentosa','Plaza Harmoni','Sinar Avenue Mall'],
+  factory:['Kilang Plastik Jaya','Maju Steel Works','Sinar Food Processing','Delta Glass Industries','Perkasa Ceramics','Bintang Packaging','Cahaya Textile Mill','Rimba Furniture Factory'],
+};
+const RIVALS = [
+  {id:'r1', name:'Gas Kilat Sdn Bhd',     short:'KILAT', color:'#e4572e', str:1.0},
+  {id:'r2', name:'Api Biru Trading',      short:'BIRU',  color:'#3b82f6', str:0.9},
+  {id:'r3', name:'Tong Emas Enterprise',  short:'EMAS',  color:'#d4a017', str:1.1},
+];
+const UPGRADES = [
+  {id:'truck',  name:'🚚 Extra Delivery Truck',       cost:2500, max:5, desc:'+10 delivery capacity · RM40/day running cost'},
+  {id:'tanker', name:'🛢️ Bulk LPG Road Tanker',       cost:3500, max:1, desc:'Unlocks BULK supply · +8 capacity · RM70/day'},
+  {id:'f14',    name:'🏗️ F14 Forklift Cylinder Program', cost:1200, max:1, desc:'Unlocks F14 for manufacturing customers'},
+  {id:'sales',  name:'🧑‍💼 Hire Sales Executive',       cost:1500, max:4, desc:'+1 customer visit per day · RM40/day salary'},
+  {id:'safety', name:'🦺 HSE Safety Certification',    cost:1200, max:1, desc:'+10 reputation · prevents cylinder incidents'},
+  {id:'mkt',    name:'📣 Marketing Campaign',          cost:800,  max:99,desc:'+10% win chance for 5 days'},
+];
+const rnd = (a,b)=>a+Math.random()*(b-a);
+const pick = a=>a[Math.floor(Math.random()*a.length)];
+const shuffle = a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt=n=>Math.round(n).toLocaleString('en-MY');
+
+// ---------- STATE ----------
+let S;
+function newGame(){
+  const tiles=[];
+  for(const k in SEG){ const names=shuffle([...NAMES[k]]);
+    for(let i=0;i<SEG[k].n;i++) tiles.push({seg:k,name:k==='household'?`${names[i%names.length]} (${10+Math.floor(Math.random()*90)} homes)`:names[i%names.length],owner:null,sat:70,lock:0,margin:1,illegal:false});
+  }
+  shuffle(tiles).forEach((t,i)=>t.id=i);
+  S={day:1,maxDay:30,cash:5000,rep:50,visits:3,lv:{truck:1,tanker:0,f14:0,sales:0,safety:0,mkt:0},mktDays:0,
+     tiles,rivals:RIVALS.map(r=>({...r,profit:0})),log:[],event:null,eventDays:0,profit:0,fines:0,sel:null,tab:'upg',over:false};
+  // starting portfolio
+  const hh=tiles.filter(t=>t.seg==='household'); hh.slice(0,4).forEach(t=>{t.owner='you';t.sat=75});
+  tiles.filter(t=>t.seg==='restaurant').slice(0,2).forEach(t=>{t.owner='you';t.sat=75});
+  tiles.find(t=>t.seg==='lobby').owner='you';
+  // rivals start with 4 customers each (no malls)
+  const free=shuffle(tiles.filter(t=>!t.owner&&t.seg!=='mall'));
+  S.rivals.forEach((r,i)=>free.slice(i*4,i*4+4).forEach(t=>{t.owner=r.id;t.sat=Math.round(rnd(50,85));t.lock=Math.floor(rnd(0,4))}));
+  S.visits=maxVisits();
+  log('Welcome, Premier Dealer! Win customers and keep them supplied.','good');
+}
+const maxVisits=()=>3+S.lv.sales;
+const has=p=>p==='BULK'?S.lv.tanker>0:p==='F14'?S.lv.f14>0:true;
+function capacity(){let c=S.lv.truck*10+(S.lv.tanker?8:0); if(S.event&&S.event.id==='flood') c=Math.floor(c*.7); return c}
+const mine=()=>S.tiles.filter(t=>t.owner==='you');
+const expectedLoad=()=>mine().reduce((s,t)=>s+SEG[t.seg].load*SEG[t.seg].orderP,0);
+const missing=t=>SEG[t.seg].prod.filter(p=>!has(p));
+const value=owner=>S.tiles.filter(t=>t.owner===owner).reduce((s,t)=>s+SEG[t.seg].profit*SEG[t.seg].orderP,0);
+function share(){const tot=S.tiles.reduce((s,t)=>s+(t.owner?SEG[t.seg].profit*SEG[t.seg].orderP:0),0);return tot?value('you')/tot*100:0}
+const ownerInfo=o=>o==='you'?{name:'YOU (Premier Dealer)',short:'YOU',color:'var(--you)'}:o?S.rivals.find(r=>r.id===o):null;
+function log(msg,cls=''){S.log.unshift({d:S.day,msg,cls}); if(S.log.length>150)S.log.pop()}
+
+// ---------- WIN CHANCE ----------
+function winChance(t,offer){
+  const sg=SEG[t.seg]; let c=sg.base+(S.rep-50)/2+(S.mktDays>0?10:0);
+  if(offer==='discount')c+=20; if(offer==='illegal')c+=35;
+  if(t.owner&&t.owner!=='you'){c-=20;c+=(70-t.sat)/2}
+  c-=missing(t).length*25;
+  if(S.event&&S.event.id==='pricewar')c-=10;
+  return Math.round(clamp(c,5,95));
+}
+
+// ---------- RENDER ----------
+const $=id=>document.getElementById(id);
+function render(){
+  $('sDay').textContent=S.day; $('sMax').textContent=S.maxDay;
+  $('sCash').textContent=fmt(S.cash); $('sCash').style.color=S.cash<0?'var(--bad)':'';
+  $('sVisits').textContent=`${S.visits}/${maxVisits()}`;
+  const el=expectedLoad(),cap=capacity();
+  $('sLoad').textContent=`${el.toFixed(0)}/${cap}`; $('sLoad').style.color=el>cap?'var(--bad)':'';
+  $('sRep').textContent=Math.round(S.rep); $('sShare').textContent=share().toFixed(0)+'%';
+  const eb=$('eventBar'); if(S.event){eb.style.display='block';eb.textContent=`📢 ${S.event.name} — ${S.event.desc} (${S.eventDays} day${S.eventDays>1?'s':''} left)`}else eb.style.display='none';
+  // map
+  $('map').innerHTML=S.tiles.map(t=>{const sg=SEG[t.seg],o=ownerInfo(t.owner);
+    const col=o?o.color:'#3a5257';
+    const satCol=t.sat>60?'var(--good)':t.sat>30?'var(--warn)':'var(--bad)';
+    return `<div class="tile ${S.sel===t.id?'sel':''}" data-id="${t.id}" style="border-color:${col};${t.owner==='you'?'background:var(--you-soft)':''}">
+      ${o?`<span class="owner" style="background:${col}">${o.short}</span>`:''}
+      <span class="badge">${t.illegal?'⚠️':''}${t.lock>0?'🔒':''}</span>
+      <div class="ic">${sg.icon}</div><div class="lbl">${sg.name}</div>
+      ${t.owner?`<div class="sat"><i style="width:${t.sat}%;background:${satCol}"></i></div>`:''}</div>`}).join('');
+  $('legend').innerHTML=`<span><i style="background:var(--you)"></i>You</span>`+S.rivals.map(r=>`<span><i style="background:${r.color}"></i>${r.name}</span>`).join('')+`<span><i style="background:#3a5257"></i>Unclaimed</span><span>🔒 under contract</span><span>⚠️ illegal supply</span>`;
+  renderPanel(); renderTab();
+}
+function renderPanel(){
+  const p=$('panel'); if(S.sel==null){return}
+  const t=S.tiles[S.sel],sg=SEG[t.seg],o=ownerInfo(t.owner);
+  let h=`<h3>${sg.icon} ${t.name}</h3><div class="muted">${sg.name} · uses ${sg.load} truck load per order · ~RM${sg.profit}/order</div>
+  <div style="margin:8px 0">${sg.prod.map(pr=>`<span class="chip ${has(pr)?PRODUCTS[pr].kind:'miss'}" title="${PRODUCTS[pr].full}">${pr}${has(pr)?'':' ✖'}</span>`).join('')}</div>
+  <div>Supplier: <b style="color:${o?o.color:'var(--muted)'}">${o?o.name:'None – open opportunity!'}</b></div>`;
+  if(t.owner) h+=`<div>Satisfaction: ${Math.round(t.sat)}%<div class="bar"><i style="width:${t.sat}%"></i></div></div>`;
+  if(missing(t).length) h+=`<p class="bad" style="font-size:12px">You can't supply ${missing(t).join(', ')} yet – buy the upgrade to win & keep this customer.</p>`;
+  if(t.owner==='you'){
+    h+=`<p class="good">✅ Your customer${t.lock>0?` · contract ${t.lock} day(s) left`:''}${t.margin<1?' · discounted price':''}</p>`;
+    if(t.illegal) h+=`<p class="bad">⚠️ You are supplying SUBSIDISED C14 to a commercial user. This is an offence – risk of enforcement raid every day!</p>
+      <button class="offer" data-act="legal">✔️ Switch to legal commercial product<small>Free · margin drops back to normal, satisfaction −10</small></button>`;
+    h+=`<button class="offer" data-act="care" ${S.visits<1||S.cash<20?'disabled':''}>🤝 Customer care visit<small>1 visit · RM20 · satisfaction +25</small></button>`;
+  } else if(t.owner&&t.lock>0){
+    h+=`<p class="warn">🔒 Under contract with ${o.name} for ${t.lock} more day(s). Come back later!</p>`;
+  } else {
+    const cost=sg.pitch;
+    h+=`<h3 style="margin-top:10px">Make your pitch</h3>
+    <button class="offer" data-act="standard" ${S.visits<1||S.cash<cost?'disabled':''}>📝 Standard offer — <b>${winChance(t,'standard')}%</b><small>RM${cost} · full margin · 5-day contract</small></button>
+    <button class="offer" data-act="discount" ${S.visits<1||S.cash<cost?'disabled':''}>💸 Discount deal — <b>${winChance(t,'discount')}%</b><small>RM${cost} · 30% lower margin · 10-day contract</small></button>`;
+    if(t.seg!=='household') h+=`<button class="offer illegal" data-act="illegal" ${S.visits<1||S.cash<cost/2?'disabled':''}>🚫 Offer cheap subsidised C14 — <b>${winChance(t,'illegal')}%</b><small>RM${Math.round(cost/2)} · +30% margin · ILLEGAL: subsidised LPG is for household use only. Raids mean big fines & lost reputation.</small></button>`;
+  }
+  p.innerHTML=h;
+}
+function renderTab(){
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  const el=$('tab');
+  if(S.tab==='upg'){
+    el.innerHTML=UPGRADES.map(u=>{const lv=S.lv[u.id],maxed=lv>=u.max;
+      return `<div class="upg"><div><b>${u.name}</b>${u.max>1&&u.max<99?` <span class="muted">(${lv}/${u.max})</span>`:''}<small>${u.desc}</small></div>
+      <button data-upg="${u.id}" ${maxed||S.cash<u.cost?'disabled':''}>${maxed?'Owned':'RM'+fmt(u.cost)}</button></div>`}).join('');
+  } else if(S.tab==='riv'){
+    const rows=[{name:'YOU (Premier Dealer)',color:'var(--you)',id:'you'},...S.rivals].map(r=>{const n=S.tiles.filter(t=>t.owner===r.id).length;return{...r,n,v:value(r.id)}}).sort((a,b)=>b.v-a.v);
+    const max=Math.max(...rows.map(r=>r.v),1);
+    el.innerHTML=rows.map((r,i)=>`<div style="margin-bottom:8px"><b style="color:${r.color}">${i+1}. ${r.name}</b> <span class="muted">${r.n} customers · RM${fmt(r.v)}/day potential</span><div class="bar"><i style="width:${r.v/max*100}%;background:${r.color}"></i></div></div>`).join('')
+      +`<p class="muted" style="font-size:12px">Unclaimed: ${S.tiles.filter(t=>!t.owner).length} customers</p>`;
+  } else {
+    el.innerHTML=`<div id="log">${S.log.map(l=>`<div class="${l.cls}"><span class="muted">D${l.d}</span> ${l.msg}</div>`).join('')}</div>`;
+  }
+}
+function toast(msg){const t=$('toast');t.innerHTML=msg;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2200)}
+function modal(html){$('modal').innerHTML=html;$('modalWrap').classList.remove('hidden')}
+function closeModal(){$('modalWrap').classList.add('hidden')}
+
+// ---------- ACTIONS ----------
+function act(a){
+  const t=S.tiles[S.sel],sg=SEG[t.seg];
+  if(a==='care'){S.visits--;S.cash-=20;t.sat=clamp(t.sat+25,0,100);toast('🤝 Happy customer! Satisfaction +25')}
+  else if(a==='legal'){t.illegal=false;t.margin=1;t.sat=clamp(t.sat-10,0,100);S.rep+=2;log(`Switched ${t.name} to legal commercial LPG.`,'good');toast('✔️ Back to compliance')}
+  else{
+    const cost=a==='illegal'?Math.round(sg.pitch/2):sg.pitch, ch=winChance(t,a);
+    S.visits--;S.cash-=cost;
+    if(Math.random()*100<ch){
+      const prev=t.owner;
+      Object.assign(t,{owner:'you',sat:a==='discount'?85:72,lock:a==='discount'?10:5,margin:a==='discount'?.7:a==='illegal'?1.3:1,illegal:a==='illegal'});
+      log(`🎉 Won ${t.name}${prev?` from ${ownerInfo(prev).name}`:''}!`,'good'); toast(`🎉 Deal signed with ${t.name}!`);
+    } else {log(`❌ ${t.name} rejected your offer.`,'bad');toast('❌ Offer rejected – try again tomorrow')}
+  }
+  render();
+}
+function buy(id){
+  const u=UPGRADES.find(x=>x.id===id); if(S.cash<u.cost)return;
+  S.cash-=u.cost; S.lv[id]++;
+  if(id==='sales')S.visits++;
+  if(id==='safety')S.rep=clamp(S.rep+10,0,100);
+  if(id==='mkt')S.mktDays=5;
+  log(`Bought ${u.name}.`,'good'); toast(`Bought ${u.name}`); render();
+}
+
+// ---------- EVENTS ----------
+const EVENTS=[
+  {id:'festive',name:'Festive Season',desc:'Hari Raya / CNY rush: all orders worth +50%',days:3},
+  {id:'rally',name:'Commercial demand surge',desc:'Hotels, malls & factories order more: +30% profit on commercial',days:3},
+  {id:'flood',name:'Flash flood',desc:'Roads closed: truck capacity −30%',days:2},
+  {id:'pricewar',name:'Rival price war',desc:'Rivals cut prices: your win chance −10%, rivals more aggressive',days:3},
+  {id:'audit',name:'Safety audit',desc:'Authorities inspecting dealers this week',days:1},
+];
+
+// ---------- END OF DAY ----------
+function endDay(){
+  if(S.over)return;
+  const R={rev:0,served:0,unserved:0,lost:[],won:[],notes:[]};
+  // deliveries
+  let cap=capacity();
+  const orders=mine().filter(t=>Math.random()<SEG[t.seg].orderP).sort((a,b)=>SEG[b.seg].profit-SEG[a.seg].profit);
+  for(const t of orders){const sg=SEG[t.seg];
+    if(cap>=sg.load){cap-=sg.load;
+      let p=sg.profit*t.margin*rnd(.85,1.15);
+      if(missing(t).length){p*=.5;t.sat-=6}
+      if(S.event?.id==='festive')p*=1.5;
+      if(S.event?.id==='rally'&&t.seg!=='household')p*=1.3;
+      R.rev+=p;R.served++;t.sat=clamp(t.sat+4,0,100);
+    } else {R.unserved++;t.sat=clamp(t.sat-18,0,100)}
+  }
+  // costs
+  const costs=S.lv.truck*40+S.lv.tanker*70+S.lv.sales*40+40;
+  S.cash+=R.rev-costs; S.profit+=R.rev-costs;
+  // illegal supply risk
+  for(const t of mine().filter(t=>t.illegal)){
+    const risk=S.event?.id==='audit'?.25:.07;
+    if(Math.random()<risk){S.cash-=3000;S.fines+=3000;S.rep=clamp(S.rep-15,0,100);t.owner=null;t.illegal=false;t.margin=1;t.lock=0;
+      R.notes.push(`<span class="bad">🚨 Enforcement raid at ${t.name}! Subsidised C14 found in commercial use. Fine RM3,000, reputation −15, supply cut off.</span>`);
+      log(`🚨 Raid at ${t.name}: fined RM3,000.`,'bad')}
+  }
+  // safety incident
+  if(!S.lv.safety&&mine().length&&Math.random()<.04){S.cash-=600;S.rep=clamp(S.rep-8,0,100);
+    R.notes.push('<span class="bad">🔥 Cylinder leak incident at a customer site. Clean-up RM600, reputation −8. (HSE certification prevents this.)</span>');log('Cylinder leak incident.','bad')}
+  if(S.event?.id==='audit'){if(S.lv.safety){S.rep=clamp(S.rep+8,0,100);R.notes.push('<span class="good">✅ Passed safety audit with HSE certification: reputation +8.</span>')}else{S.rep=clamp(S.rep-4,0,100);R.notes.push('<span class="warn">Safety audit found gaps: reputation −4.</span>')}}
+  // churn
+  for(const t of mine()) if(t.sat<=0){t.owner=null;t.lock=0;t.illegal=false;R.lost.push(`${t.name} (left – no supply)`);log(`${t.name} left you: too many missed deliveries.`,'bad')}
+  // rivals act
+  const aggr=S.event?.id==='pricewar'?.15:0;
+  for(const r of S.rivals){
+    r.profit+=value(r.id);
+    const tries=1+Math.floor(S.day/12)+(Math.random()<.3?1:0);
+    for(let k=0;k<tries;k++){
+      const cands=S.tiles.filter(t=>t.owner!==r.id&&t.lock<=0);
+      if(!cands.length)break;
+      const w=cands.map(t=>(!t.owner?3:t.owner==='you'&&t.sat<50?4:1)*(1+SEG[t.seg].profit/100));
+      let x=Math.random()*w.reduce((a,b)=>a+b,0),t=cands[0];for(let i=0;i<cands.length;i++){x-=w[i];if(x<=0){t=cands[i];break}}
+      const def=!t.owner?0:t.owner==='you'?t.sat/250+S.rep/500:.25;
+      const ch=SEG[t.seg].base/100*r.str+.05+aggr-def;
+      if(Math.random()<ch){const prev=t.owner;
+        if(prev==='you'){R.lost.push(`${t.name} → ${r.name}`);log(`😠 ${r.name} stole ${t.name}!`,'bad')}
+        else log(`${r.name} signed ${t.name}${prev?' from '+ownerInfo(prev).name:''}.`,'muted');
+        Object.assign(t,{owner:r.id,sat:Math.round(rnd(55,85)),lock:Math.floor(rnd(3,7)),margin:1,illegal:false});
+      }
+    }
+  }
+  // drift
+  for(const t of S.tiles){if(t.lock>0)t.lock--; if(t.owner&&t.owner!=='you')t.sat=clamp(t.sat+rnd(-8,6),20,95); if(t.owner==='you')t.sat=clamp(t.sat-1.5,0,100)}
+  if(S.mktDays>0)S.mktDays--;
+  // event tick & new event
+  if(S.event){S.eventDays--;if(S.eventDays<=0)S.event=null}
+  S.day++;
+  if(!S.event&&Math.random()<.28){const e=pick(EVENTS);S.event=e;S.eventDays=e.days;R.notes.push(`<span class="warn">📢 New event: <b>${e.name}</b> – ${e.desc}</span>`);log(`Event: ${e.name}`,'warn')}
+  S.visits=maxVisits();
+  log(`Day report: ${R.served} deliveries, revenue RM${fmt(R.rev)}, costs RM${fmt(costs)}.`);
+
+  if(S.cash<-3000){return gameOver('bankrupt')}
+  if(S.day>S.maxDay){return gameOver('end')}
+  modal(`<h2>📋 End of Day ${S.day-1}</h2>
+    <table><tr><td>Deliveries made</td><td><b>${R.served}</b></td></tr>
+    <tr><td>Orders missed (no truck capacity)</td><td class="${R.unserved?'bad':''}"><b>${R.unserved}</b></td></tr>
+    <tr><td>Revenue margin</td><td class="good">+RM${fmt(R.rev)}</td></tr>
+    <tr><td>Operating costs (trucks, staff, depot)</td><td class="bad">−RM${fmt(costs)}</td></tr>
+    <tr><td><b>Cash now</b></td><td><b>RM${fmt(S.cash)}</b></td></tr></table>
+    ${R.unserved?'<p class="warn">Missed orders hurt satisfaction. Buy more trucks or a tanker!</p>':''}
+    ${R.lost.length?`<p class="bad">Lost customers: ${R.lost.join(', ')}</p>`:''}
+    ${R.notes.map(n=>`<p>${n}</p>`).join('')}
+    ${S.cash<0?'<p class="bad">⚠️ Your cash is negative. Below −RM3,000 you go bankrupt!</p>':''}
+    <button class="primary" onclick="closeModal()">Start Day ${S.day} ▶</button>`);
+  render();
+}
+function gameOver(why){
+  S.over=true; render();
+  const rows=[{name:'YOU (Premier Dealer)',color:'var(--you)',id:'you'},...S.rivals].map(r=>({...r,v:value(r.id),n:S.tiles.filter(t=>t.owner===r.id).length})).sort((a,b)=>b.v-a.v);
+  const rank=rows.findIndex(r=>r.id==='you')+1, sh=share();
+  const score=Math.round(Math.max(0,S.cash)/10+sh*40+S.rep*10-S.fines/5);
+  const title=why==='bankrupt'?'💥 Bankrupt!':rank===1?'🏆 Top Premier Dealer!':rank===2?'🥈 Strong runner-up':'📉 Room to grow';
+  modal(`<h2>${title}</h2>
+   <p>${why==='bankrupt'?'Your cash fell below −RM3,000.':`After ${S.maxDay} days you ranked <b>#${rank}</b> of ${rows.length} dealers.`}</p>
+   <table><tr><th>Dealer</th><th>Customers</th><th>Daily value</th></tr>
+   ${rows.map(r=>`<tr><td style="color:${r.color}"><b>${r.name}</b></td><td>${r.n}</td><td>RM${fmt(r.v)}</td></tr>`).join('')}</table>
+   <p>Market share: <b>${sh.toFixed(1)}%</b> · Cash: <b>RM${fmt(S.cash)}</b> · Reputation: <b>${Math.round(S.rep)}</b> · Fines paid: <b class="${S.fines?'bad':''}">RM${fmt(S.fines)}</b></p>
+   <h3>Score: ${fmt(score)}</h3>
+   <p class="muted">${S.fines?'Tip: the subsidised C14 shortcut cost you. Commercial customers must use unsubsidised C14C, C50, F14 or bulk LPG.':'Clean record — you stayed compliant with subsidised LPG rules. 👏'}</p>
+   <button class="primary" onclick="closeModal();newGame();S.sel=null;$('panel').innerHTML='<h3>Select a customer</h3>';render()">Play again</button>`);
+}
+
+// ---------- INTRO ----------
+function intro(){
+  modal(`<h2>⛽ LPG Dealer Wars</h2>
+  <p>You are a <b>Premier LPG Dealer</b>. Three rival dealers are fighting you for every customer in town. You have <b>30 days</b> to build the biggest, most profitable and most compliant customer base.</p>
+  <table>
+   <tr><th>Customer</th><th>Needs</th></tr>
+   ${Object.values(SEG).map(s=>`<tr><td>${s.icon} ${s.name}</td><td>${s.prod.map(p=>`<span class="chip ${PRODUCTS[p].kind}">${p}</span>`).join('')}</td></tr>`).join('')}
+  </table>
+  <h3 style="margin-top:12px">How to play</h3>
+  <ul>
+   <li>Tap a customer and <b>pitch</b> (uses 1 visit). Bigger customers pay more but are harder to win.</li>
+   <li><b>End Day</b> to deliver. Each order uses truck load — if you run out of capacity, orders are missed and customers get unhappy.</li>
+   <li>Hotels, malls & factories need <b>BULK</b> (buy a road tanker); factories also need <b>F14</b> forklift cylinders.</li>
+   <li>Rivals will steal unhappy customers. Use 🤝 care visits to keep them loyal.</li>
+   <li><span class="chip sub">C14</span> is <b>subsidised</b> and for <b>household</b> use only. Selling it to commercial customers is tempting… and illegal. Expect raids & fines!</li>
+  </ul>
+  <button class="primary" onclick="closeModal()">Start my dealership ▶</button>`);
+}
+
+// ---------- WIRING ----------
+document.addEventListener('click',e=>{
+  const tile=e.target.closest('.tile'); if(tile){S.sel=+tile.dataset.id;render();if(innerWidth<900)$('panel').scrollIntoView({behavior:'smooth',block:'start'});return}
+  const a=e.target.closest('[data-act]'); if(a&&!a.disabled){act(a.dataset.act);return}
+  const u=e.target.closest('[data-upg]'); if(u&&!u.disabled){buy(u.dataset.upg);return}
+  const tb=e.target.closest('[data-tab]'); if(tb){S.tab=tb.dataset.tab;renderTab();return}
+});
+$('endDay').onclick=endDay;
+newGame(); render(); intro();
+</script>
+</body>
+</html>
