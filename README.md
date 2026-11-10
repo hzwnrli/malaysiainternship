@@ -7,8 +7,10 @@ A driving game. You are the **green** company's lorry, racing **blue**, **yellow
 
 - Customers post requests (💬). Drive to their door before the rivals get there.
 - When you arrive, pick an offer within 5 seconds: **Standard price**, **Discount**, or **Trade marketing** (free safety check, promo banner and loyalty card, which keeps the customer loyal).
+- Every order has a quantity (for example 4×C50). You need at least that many on board to make the sale.
 - Deliver 📦 reorders to your own customers on time, or they start looking for another supplier.
-- Your lorry carries C14, C14C, C50, F14 and bulk LPG. Reload at the green depot.
+- Your lorry holds 30 units of C14, C14C, C50, F14 and bulk LPG. When you run low, park at the LPG terminal and buy more stock with your cash. Rival lorries have to refill there too.
+- Profit is the selling price minus the terminal buying price.
 - Controls: arrow keys / WASD, tap the map to auto-drive, keys 1–3 to choose offers. On phones there's an on-screen D-pad.
 
 ## ⛽ LPG Dealer Wars (`lpg-dealer-wars/index.html`)

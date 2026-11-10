@@ -25,6 +25,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3a;touch-action:none}
 #offer{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(520px,94%);background:#0d1712f2;border:2px solid var(--green);border-radius:14px;padding:12px;display:none}
 #offer h3{margin:0 0 4px}
+.shop{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}.shop td{padding:3px 4px;border-bottom:1px solid var(--line)}.shop button{padding:2px 10px}
 #offer .timer{height:6px;background:#0008;border-radius:3px;overflow:hidden;margin:6px 0}
 #offer .timer i{display:block;height:100%;background:var(--warn)}
 .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -70,7 +71,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <button class="down" data-d="down">▼</button><button class="right" data-d="right">▶</button>
   </div>
   <div class="help">
-    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Reload</b> at the green ⛽ depot.<br>
+    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 30 units).<br>
     💬 white bubble = new customer · 🟠 orange = wants to switch supplier · 📦 = your customer reordering (deliver fast!).<br>
     Products: <span class="chip sub">C14</span> subsidised, households only · <span class="chip com">C14C</span> <span class="chip com">C50</span> <span class="chip com">F14</span> <span class="chip com">BULK</span> commercial. Game numbers are not real prices.
   </div>
@@ -89,12 +90,12 @@ const COMPANIES={
   red:{name:'Merah Gas Enterprise',short:'RED',color:'#dc2626'},
 };
 const TYPES={
-  household:{name:'Household',icon:'🏠',prod:['C14'],profit:12,base:62,w:34},
-  restaurant:{name:'Restaurant',icon:'🍜',prod:['C14C','C50'],profit:40,base:52,w:20},
-  lobby:{name:'Lobby / Café',icon:'☕',prod:['C14C'],profit:28,base:56,w:12},
-  hotel:{name:'Hotel',icon:'🏨',prod:['C50','BULK'],profit:85,base:42,w:12},
-  mall:{name:'Hospitality Mall',icon:'🏬',prod:['BULK','C50'],profit:120,base:36,w:8},
-  factory:{name:'Manufacturing',icon:'🏭',prod:['F14','BULK','C50'],profit:150,base:32,w:14},
+  household:{name:'Household',icon:'🏠',prod:['C14'],qty:{C14:[1,2]},profit:12,base:62,w:34},
+  restaurant:{name:'Restaurant',icon:'🍜',prod:['C14C','C50'],qty:{C14C:[2,5],C50:[1,3]},profit:40,base:52,w:20},
+  lobby:{name:'Lobby / Café',icon:'☕',prod:['C14C'],qty:{C14C:[1,3]},profit:28,base:56,w:12},
+  hotel:{name:'Hotel',icon:'🏨',prod:['C50','BULK'],qty:{C50:[2,4],BULK:[2,4]},profit:85,base:42,w:12},
+  mall:{name:'Hospitality Mall',icon:'🏬',prod:['BULK','C50'],qty:{BULK:[3,6],C50:[3,5]},profit:120,base:36,w:8},
+  factory:{name:'Manufacturing',icon:'🏭',prod:['F14','BULK','C50'],qty:{F14:[3,6],BULK:[3,6],C50:[2,4]},profit:150,base:32,w:14},
 };
 const NAMES={
   household:['Taman Melur','Taman Sri Muda','Kg. Baru','Taman Bukit Indah','Taman Seroja','Desa Aman','Taman Cempaka','Kg. Padang','Taman Mawar','Taman Orkid','Taman Dahlia','Kg. Sungai Ara','Taman Bayu','Taman Kasturi'],
@@ -104,10 +105,24 @@ const NAMES={
   mall:['Mutiara City Mall','Galeria Sentosa','Plaza Harmoni','Sinar Avenue Mall'],
   factory:['Kilang Plastik Jaya','Maju Steel Works','Sinar Food Processing','Delta Glass','Perkasa Ceramics','Bintang Packaging'],
 };
-const FULL_CARGO={C14:6,C14C:4,C50:4,F14:2,BULK:3};
+const CAP=30; // lorry capacity in units (1 cylinder or 1 bulk unit = 1)
+const PRODS=['C14','C14C','C50','F14','BULK'];
+const PRICE={ // game prices per unit (not real prices)
+  C14:{buy:20,sell:27,label:'C14 14kg subsidised'},
+  C14C:{buy:45,sell:62,label:'C14C 14kg commercial'},
+  C50:{buy:160,sell:215,label:'C50 50kg commercial'},
+  F14:{buy:50,sell:70,label:'F14 14kg forklift'},
+  BULK:{buy:200,sell:270,label:'BULK LPG (100kg unit)'},
+};
+const MIX={C14:.2,C14C:.25,C50:.2,F14:.15,BULK:.2};
+const START_CARGO={C14:4,C14C:4,C50:3,F14:2,BULK:2};
+const loadOf=cg=>PRODS.reduce((s,k)=>s+cg[k],0);
+const rint=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const saleValue=(prod,qty,margin)=>qty*PRICE[prod].sell*margin;
+const saleProfit=(prod,qty,margin)=>qty*(PRICE[prod].sell*margin-PRICE[prod].buy);
 const OFFERS=[
   {id:'std',name:'Standard price',desc:'Full margin',bonus:0,margin:1,cost:0},
-  {id:'disc',name:'Discount price',desc:'+25% chance · 40% less margin',bonus:25,margin:.6,cost:0},
+  {id:'disc',name:'Discount price',desc:'+25% chance · 15% off selling price',bonus:25,margin:.85,cost:0},
   {id:'tm',name:'Trade marketing',desc:'Free safety check, promo banner & loyalty card · RM60 budget · customer stays loyal',bonus:35,margin:1,cost:60},
 ];
 const DIRS={up:{dx:0,dy:-1},down:{dx:0,dy:1},left:{dx:-1,dy:0},right:{dx:1,dy:0}};
@@ -118,13 +133,13 @@ const isRoad=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&(x%4===0||y%4===0);
 const key=(x,y)=>y*W+x;
 
 // ================= STATE =================
-let G, customers, lorries, player, depot, reqTimer, offer, bg;
+let G, customers, lorries, player, depot, reqTimer, offer, shop=null, shopDismissed=false, bg;
 const held=new Set(); let lastKey=null;
 
 function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Math.random()*tot;for(const k in TYPES){r-=TYPES[k].w;if(r<=0)return k}return 'household'}
 
 function newGame(){
-  G={time:GAME_TIME,cash:300,mkt:300,running:false,over:false,elapsed:0,money:{you:0,blue:0,yellow:0,red:0}};
+  G={spent:0,time:GAME_TIME,cash:1000,mkt:300,running:false,over:false,elapsed:0,money:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
   depot={bx:3,by:2}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
   for(let by=0;by<4;by++)for(let bx=0;bx<6;bx++){
@@ -144,10 +159,10 @@ function newGame(){
   pool.filter(c=>c.type==='household').slice(0,2).forEach(c=>c.owner='you');
   ['blue','yellow','red'].forEach(co=>{let k=0;for(const c of pool){if(!c.owner&&k<3){c.owner=co;k++}}});
   // lorries
-  const mk=(co,x,y,speed)=>({co,x,y,nx:x,ny:y,moving:false,dir:DIRS.right,speed,path:[],target:null,cargo:{...FULL_CARGO},halt:false,think:0});
+  const mk=(co,x,y,speed)=>({co,x,y,nx:x,ny:y,moving:false,dir:DIRS.right,speed,path:[],target:null,cargo:{...START_CARGO},load:20,halt:false,think:0});
   player=mk('you',depot.door.x,depot.door.y,4.3);
   lorries=[player,mk('blue',0,0,3.1),mk('yellow',W-1,0,3.25),mk('red',0,H-1,3.4)];
-  reqTimer=1; offer=null; bg=null;
+  reqTimer=1; offer=null; shop=null; shopDismissed=true; bg=null;
   for(let i=0;i<4;i++)spawnRequest();
   hideOffer(); updateHud();
 }
@@ -173,14 +188,15 @@ function spawnRequest(){
   if(!c){const open=free.filter(c=>c.owner!=='you'&&!(c.loyal&&c.owner));
     if(!open.length)return; c=pick(open); kind=c.owner?'switch':'new'}
   const max=kind==='reorder'?22:17;
-  c.req={kind,product:pick(TYPES[c.type].prod),t:max,max}; c.cool={};
+  const product=pick(TYPES[c.type].prod), q=TYPES[c.type].qty[product];
+  c.req={kind,product,qty:rint(q[0],q[1]),t:max,max}; c.cool={};
 }
 function expireRequest(c){
   const r=c.req; c.req=null;
   if(r.kind==='reorder'){
     // owner failed to deliver → customer unhappy, open for everyone
     if(c.owner==='you')toast(`😠 ${c.name} waited too long! They're shopping around…`,'bad');
-    c.loyal=false; c.req={kind:'switch',product:r.product,t:15,max:15,unhappy:true}; c.cool={};
+    c.loyal=false; c.req={kind:'switch',product:r.product,qty:r.qty,t:15,max:15,unhappy:true}; c.cool={};
   }
 }
 
@@ -193,37 +209,41 @@ function chance(lorry,c,offerId){
   else p+=8+Math.min(15,G.elapsed/12); // rivals get sharper
   return Math.round(clamp(p,5,95));
 }
+function sell(co,c,margin){
+  const r=c.req, earn=saleValue(r.product,r.qty,margin);
+  G.money[co]+=saleProfit(r.product,r.qty,margin);
+  const l=lorries.find(l=>l.co===co);
+  if(co==='you'){G.cash+=earn;l.cargo[r.product]-=r.qty}else l.load-=r.qty;
+  return earn;
+}
 function win(co,c,margin,loyal){
-  const prev=c.owner, earn=TYPES[c.type].profit*margin;
+  const prev=c.owner, earn=sell(co,c,margin);
   c.owner=co;c.margin=margin;c.loyal=!!loyal;c.req=null;
-  G.money[co]+=earn; if(co==='you'){G.cash+=earn}
   return {prev,earn};
 }
 function arrive(l){
-  // depot reload
-  if(l===player&&l.x===depot.door.x&&l.y===depot.door.y){
-    const need=Object.keys(FULL_CARGO).some(k=>l.cargo[k]<FULL_CARGO[k]);
-    if(need){l.cargo={...FULL_CARGO};toast('⛽ Lorry reloaded with cylinders & bulk LPG');updateHud()}
-  }
+  // rivals refill at the terminal
+  if(l!==player&&l.x===depot.door.x&&l.y===depot.door.y){l.load=CAP;l.target=null}
   const c=customers.find(c=>c.req&&c.door.x===l.x&&c.door.y===l.y);
   if(!c)return;
   const r=c.req;
   if(r.kind==='reorder'){
     if(c.owner!==l.co)return;
     if(l.co==='you'){
-      if(l.cargo[r.product]<=0){toast(`No ${r.product} on board! Reload at the ⛽ depot.`,'bad');return}
-      l.cargo[r.product]--;
-    }
-    const earn=TYPES[c.type].profit*c.margin; G.money[l.co]+=earn; if(l.co==='you'){G.cash+=earn;G.mkt+=20;toast(`📦 Delivered ${r.product} to ${c.name} +RM${fmt(earn)} · +RM20 marketing budget`,'good');updateHud()}
+      if(l.cargo[r.product]<r.qty){toast(`Need ${r.qty}× ${r.product} but only ${l.cargo[r.product]} on board! Buy more at the ⛽ terminal.`,'bad');return}
+    } else if(l.load<r.qty)return;
+    const earn=sell(l.co,c,c.margin);
+    if(l.co==='you'){G.mkt+=20;toast(`📦 Delivered ${r.qty}× ${r.product} to ${c.name} +RM${fmt(earn)} · +RM20 marketing budget`,'good');updateHud()}
     c.req=null; return;
   }
   // open opportunity
   if(c.cool[l.co]>0)return;
   if(l.co==='you'){
     if(c.owner==='you'&&!r.unhappy)return;
-    openOffer(c); return;
+    if(!shop)openOffer(c); return;
   }
   if(c.owner===l.co&&!r.unhappy)return;
+  if(l.load<r.qty)return;
   if(Math.random()*100<chance(l,c)){
     const {prev}=win(l.co,c,1,false);
     if(offer&&offer.c===c){hideOffer();toast(`Too slow! ${COMPANIES[l.co].name} closed the deal at ${c.name}.`,'bad')}
@@ -239,28 +259,69 @@ function openOffer(c){
 }
 function renderOffer(){
   if(!offer)return; const c=offer.c,r=c.req,ty=TYPES[c.type];
-  const have=player.cargo[r.product];
+  const have=player.cargo[r.product], enough=have>=r.qty;
   offerEl.style.display='block';
   offerEl.innerHTML=`<h3>${ty.icon} ${c.name}</h3>
-   <div class="muted">${ty.name} wants <b>${r.product}</b> · on board: <b class="${have?'good':'bad'}">${have}</b>${c.owner&&c.owner!=='you'?` · current supplier <b style="color:${COMPANIES[c.owner].color}">${COMPANIES[c.owner].short}</b>`:''}${r.unhappy?' · <span class="warn">unhappy – easier to win</span>':''}</div>
+   <div class="muted">${ty.name} orders <b>${r.qty}× ${r.product}</b> (RM${fmt(saleValue(r.product,r.qty,1))}) · on board: <b class="${enough?'good':'bad'}">${have}</b>${c.owner&&c.owner!=='you'?` · current supplier <b style="color:${COMPANIES[c.owner].color}">${COMPANIES[c.owner].short}</b>`:''}${r.unhappy?' · <span class="warn">unhappy – easier to win</span>':''}</div>
    <div class="timer"><i id="otimer" style="width:${offer.t/offer.max*100}%"></i></div>
-   ${have?`<div class="opts">${OFFERS.map((o,i)=>`<button data-offer="${o.id}" ${o.cost>G.mkt?'disabled':''}><span class="pct">${chance(player,c,o.id)}%</span><b>${i+1}. ${o.name}</b>${o.desc}</button>`).join('')}</div>`
-   :`<p class="bad">You have no ${r.product} on your lorry. Go back to the ⛽ depot to reload!</p><button data-offer="leave">Leave</button>`}`;
+   ${enough?`<div class="opts">${OFFERS.map((o,i)=>`<button data-offer="${o.id}" ${o.cost>G.mkt?'disabled':''}><span class="pct">${chance(player,c,o.id)}%</span><b>${i+1}. ${o.name}</b>${o.desc}</button>`).join('')}</div>`
+   :`<p class="bad">Not enough ${r.product}: they need ${r.qty}, you have ${have}. Buy more at the ⛽ LPG terminal!</p><button data-offer="leave">Leave</button>`}`;
 }
 function chooseOffer(id){
   if(!offer)return; const c=offer.c;
   if(id==='leave'||!c.req){c.cool.you=3;return hideOffer()}
   const o=OFFERS.find(o=>o.id===id); if(o.cost>G.mkt)return;
-  if(player.cargo[c.req.product]<=0)return;
+  if(player.cargo[c.req.product]<c.req.qty)return;
   G.mkt-=o.cost;
   if(Math.random()*100<chance(player,c,id)){
-    player.cargo[c.req.product]--;
-    const {prev,earn}=win('you',c,o.margin,id==='tm');
-    toast(`🎉 Deal! ${c.name} is now a Green Gas customer${prev?` (won from ${COMPANIES[prev].short})`:''} +RM${fmt(earn)}`,'good');
+    const r=c.req, {prev,earn}=win('you',c,o.margin,id==='tm');
+    toast(`🎉 Deal! ${c.name} is now a Green Gas customer${prev?` (won from ${COMPANIES[prev].short})`:''} · sold ${r.qty}× ${r.product} +RM${fmt(earn)}`,'good');
   } else {c.cool.you=5;toast(`❌ ${c.name} said no. Try again in a few seconds.`,'bad')}
   hideOffer(); updateHud();
 }
 function hideOffer(){offer=null;offerEl.style.display='none';if(player)player.halt=false}
+
+// ================= TERMINAL (buy stock) =================
+function suggestBuy(){
+  const free=CAP-loadOf(player.cargo), b={};
+  PRODS.forEach(k=>b[k]=Math.floor(free*MIX[k]));
+  b.C14C+=free-PRODS.reduce((s,k)=>s+b[k],0);
+  // trim until affordable
+  const cost=()=>PRODS.reduce((s,k)=>s+b[k]*PRICE[k].buy,0);
+  while(cost()>G.cash){const k=PRODS.filter(k=>b[k]>0).sort((x,y)=>PRICE[y].buy-PRICE[x].buy)[0];if(!k)break;b[k]--}
+  return b;
+}
+function openShop(){player.halt=true;player.path=[];shop={buy:suggestBuy()};renderShop()}
+function shopCost(){return PRODS.reduce((s,k)=>s+shop.buy[k]*PRICE[k].buy,0)}
+function renderShop(){
+  if(!shop)return;
+  const cur=loadOf(player.cargo),add=PRODS.reduce((s,k)=>s+shop.buy[k],0),cost=shopCost();
+  offerEl.style.display='block';
+  offerEl.innerHTML=`<h3>⛽ LPG Terminal – buy stock</h3>
+   <div class="muted">Lorry capacity: <b>${cur+add}/${CAP}</b> units after purchase · Cash RM${fmt(G.cash)}</div>
+   <table class="shop">${PRODS.map(k=>`<tr><td><b>${k}</b><br><small class="muted">buy RM${PRICE[k].buy} · sell RM${PRICE[k].sell}</small></td>
+     <td class="muted">on board ${player.cargo[k]}</td>
+     <td style="white-space:nowrap"><button data-shop="minus:${k}">−</button> <b style="display:inline-block;width:22px;text-align:center">${shop.buy[k]}</b> <button data-shop="plus:${k}">+</button></td></tr>`).join('')}</table>
+   <div style="margin:6px 0">Total: <b class="${cost>G.cash?'bad':''}">RM${fmt(cost)}</b></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap">
+     <button class="primary" data-shop="buy" ${cost>G.cash||!add?'disabled':''}>Buy & go (Enter)</button>
+     <button data-shop="fill">Fill evenly</button><button data-shop="clear">Clear</button><button data-shop="leave">Leave (Esc)</button></div>`;
+}
+function shopAction(a){
+  if(!shop)return;
+  const [act,k]=a.split(':');
+  const free=CAP-loadOf(player.cargo)-PRODS.reduce((s,k)=>s+shop.buy[k],0);
+  if(act==='plus'&&free>0&&shopCost()+PRICE[k].buy<=G.cash)shop.buy[k]++;
+  else if(act==='minus'&&shop.buy[k]>0)shop.buy[k]--;
+  else if(act==='fill')shop.buy=suggestBuy();
+  else if(act==='clear')PRODS.forEach(k=>shop.buy[k]=0);
+  else if(act==='buy'){const cost=shopCost();if(cost>G.cash)return;
+    PRODS.forEach(k=>player.cargo[k]+=shop.buy[k]);G.cash-=cost;G.spent+=cost;
+    toast(`⛽ Bought stock for RM${fmt(cost)} · lorry ${loadOf(player.cargo)}/${CAP}`,'good');return hideShop()}
+  else if(act==='leave')return hideShop();
+  renderShop();updateHud();
+}
+function hideShop(){shop=null;shopDismissed=true;offerEl.style.display='none';player.halt=false;updateHud()}
 
 // ================= MOVEMENT =================
 function playerDir(l){
@@ -272,18 +333,21 @@ function playerDir(l){
   return null;
 }
 function rivalPlan(l){
+  const toTerminal=()=>{l.target=null;l.path=bfs(l.x,l.y,depot.door.x,depot.door.y)||[]};
+  if(l.load<4)return toTerminal();
   const opts=[];
   for(const c of customers){const r=c.req;if(!r)continue;
     let ok=false,val=TYPES[c.type].profit;
     if(r.kind==='reorder')ok=c.owner===l.co;
     else ok=(c.owner!==l.co||r.unhappy)&&!(c.cool[l.co]>0);
-    if(!ok)continue;
+    if(!ok||r.qty>l.load)continue;
     const p=bfs(l.x,l.y,c.door.x,c.door.y); if(!p)continue;
     if(p.length/l.speed>r.t+1)continue;
     opts.push({c,p,score:(p.length+3)/(val+40)*(r.kind==='reorder'?.7:1)*rnd(.8,1.2)});
   }
   opts.sort((a,b)=>a.score-b.score);
   if(opts.length){l.target=opts[0].c;l.path=opts[0].p;return}
+  if(l.load<CAP/2)return toTerminal();
   // wander
   l.target=null; let tx,ty;do{tx=Math.floor(Math.random()*W);ty=Math.floor(Math.random()*H)}while(!isRoad(tx,ty));
   l.path=(bfs(l.x,l.y,tx,ty)||[]).slice(0,6);
@@ -323,6 +387,9 @@ function frame(ts){
       if(c.req){c.req.t-=dt;if(c.req.t<=0)expireRequest(c)}
     }
     for(const l of lorries)move(l,dt);
+    const atTerm=!player.moving&&player.x===depot.door.x&&player.y===depot.door.y;
+    if(!atTerm)shopDismissed=false;
+    else if(!shopDismissed&&!shop&&!offer&&!held.size&&!player.path.length)openShop();
     if(offer){offer.t-=dt;const b=document.getElementById('otimer');if(b)b.style.width=Math.max(0,offer.t/offer.max*100)+'%';
       if(!offer.c.req||(offer.c.owner&&offer.c.owner!=='you'&&!offer.c.req)){hideOffer()}
       else if(offer.t<=0){offer.c.cool.you=4;toast('⌛ Too slow – the customer walked away.','bad');hideOffer()}}
@@ -346,7 +413,7 @@ function buildBg(){
       b.stroke();b.setLineDash([]);
     } else {
       const bx=Math.floor(x/4),by=Math.floor(y/4);
-      if(bx===depot.bx&&by===depot.by){b.fillStyle='#14532d';b.fillRect(x*T,y*T,T,T);continue}
+      if(bx===depot.bx&&by===depot.by){b.fillStyle='#334155';b.fillRect(x*T,y*T,T,T);continue}
       b.fillStyle=(x+y)%2?'#4a8a57':'#468453';b.fillRect(x*T,y*T,T,T);
       if(!customers.some(c=>c.x===x&&c.y===y)){ // scenery
         const s=(x*7+y*13)%5; b.font='18px serif';b.textAlign='center';b.textBaseline='middle';
@@ -356,9 +423,9 @@ function buildBg(){
   }
   // depot
   const dx=(4*depot.bx+1)*T,dy=(4*depot.by+1)*T;
-  b.fillStyle='#16a34a';b.fillRect(dx+4,dy+4,3*T-8,3*T-8);
+  b.fillStyle='#475569';b.fillRect(dx+4,dy+4,3*T-8,3*T-8);
   b.fillStyle='#fff';b.font='bold 13px system-ui';b.textAlign='center';b.textBaseline='middle';
-  b.fillText('GREEN GAS',dx+1.5*T,dy+T*0.75);b.fillText('DEPOT',dx+1.5*T,dy+T*2.3);
+  b.fillText('LPG',dx+1.5*T,dy+T*0.75);b.fillText('TERMINAL',dx+1.5*T,dy+T*2.3);
   b.font='26px serif';b.fillText('⛽',dx+1.5*T,dy+1.5*T);
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
@@ -379,7 +446,7 @@ function draw(){
   for(const c of customers){if(!c.req)continue;const r=c.req;
     const px=c.x*T+T/2,py=c.y*T-10;
     const col=r.kind==='reorder'?COMPANIES[c.owner].color:r.kind==='switch'||r.unhappy?'#f97316':'#ffffff';
-    const label=(r.kind==='reorder'?'📦 ':'💬 ')+r.product;
+    const label=(r.kind==='reorder'?'📦 ':'💬 ')+r.qty+'×'+r.product;
     ctx.font='bold 11px system-ui';const w=ctx.measureText(label).width+14;
     const pulse=r.t<5?(Math.sin(performance.now()/90)>0?1:.5):1;
     ctx.globalAlpha=pulse;ctx.fillStyle=col;rr(px-w/2,py-9,w,18,8);ctx.fill();
@@ -408,6 +475,8 @@ function drawLorry(l){
   ctx.font='bold 9px system-ui';ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=3;
   ctx.strokeText(COMPANIES[l.co].short,cx,cy-15);ctx.fillText(COMPANIES[l.co].short,cx,cy-15);
   if(l===player){ctx.strokeStyle='#4ade80';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,19,0,7);ctx.stroke()}
+  const ld=(l===player?loadOf(l.cargo):l.load)/CAP;
+  ctx.fillStyle='#000a';ctx.fillRect(cx-12,cy+12,24,4);ctx.fillStyle=ld<.2?'#f87171':'#4ade80';ctx.fillRect(cx-12,cy+12,24*ld,4);
 }
 
 // ================= HUD =================
@@ -417,8 +486,9 @@ function updateHud(){
   $('sTime').style.color=t<30?'var(--bad)':'';
   $('sCash').textContent=fmt(G.cash);$('sMkt').textContent=fmt(G.mkt);
   $('board').innerHTML=Object.entries(COMPANIES).map(([k,c])=>{const n=customers.filter(x=>x.owner===k).length;
-    return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> ${n} customers · RM${fmt(G.money[k])}</div>`}).join('');
-  $('cargo').innerHTML='<span class="muted">🚚 On board:</span>'+Object.keys(FULL_CARGO).map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${k} ${player.cargo[k]}/${FULL_CARGO[k]}</span>`).join('');
+    return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> ${n} customers · profit RM${fmt(G.money[k])}</div>`}).join('');
+  const ld=loadOf(player.cargo);
+  $('cargo').innerHTML=`<span class="cg ${ld<6?'empty':''}">🚚 Load <b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${k} ${player.cargo[k]}</span>`).join('');
 }
 function toast(msg,cls=''){const t=$('toast');t.innerHTML=msg;t.className=cls;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2300)}
 function modal(h){$('modal').innerHTML=h;$('modalWrap').classList.remove('hidden')}
@@ -430,10 +500,10 @@ function endGame(){
     .map(r=>({...r,score:Math.round(r.m+r.n*60)})).sort((a,b)=>b.score-a.score);
   const rank=rows.findIndex(r=>r.k==='you')+1;
   modal(`<h2>${rank===1?'🏆 Green Gas wins the town!':rank===2?'🥈 So close!':'📉 The rivals out-drove you'}</h2>
-   <p>You finished <b>#${rank}</b>. Score = sales + RM60 per customer you hold at the end.</p>
-   <table><tr><th>Company</th><th>Customers</th><th>Sales</th><th>Score</th></tr>
+   <p>You finished <b>#${rank}</b>. Score = gross profit (sales minus terminal price) + RM60 per customer you hold at the end. You finished with RM${fmt(G.cash)} cash.</p>
+   <table><tr><th>Company</th><th>Customers</th><th>Profit</th><th>Score</th></tr>
    ${rows.map(r=>`<tr><td style="color:${r.color}"><b>${r.name}</b></td><td>${r.n}</td><td>RM${fmt(r.m)}</td><td><b>${fmt(r.score)}</b></td></tr>`).join('')}</table>
-   <p class="muted">Tips: plan your route, keep the lorry stocked, use trade marketing on big customers so rivals can't steal them, and never miss a 📦 reorder.</p>
+   <p class="muted">Tips: plan your route, buy the right mix at the terminal so you have enough for big orders, use trade marketing on big customers so rivals can't steal them, and never miss a 📦 reorder.</p>
    <button class="primary" onclick="closeModal();newGame();G.running=true">Play again</button>`);
 }
 function intro(){
@@ -443,7 +513,7 @@ function intro(){
    <li><b>💬 Customer bubble</b> = someone looking for an LPG supplier. Drive to the dot at their door <b>before the rivals do</b>.</li>
    <li>When you arrive, pick an offer <b>fast</b> (5 seconds, keys 1/2/3): <b>Standard price</b>, <b>Discount</b>, or <b>Trade marketing</b> (free safety check, promo banner and loyalty card; costs marketing budget, but ⭐ loyal customers can't be poached).</li>
    <li><b>📦 Reorder</b> = your customer needs more gas. Deliver before the timer runs out, or they'll start shopping around. Each delivery adds RM20 to your marketing budget.</li>
-   <li>You need the right product on board. Reload at the <b>⛽ depot</b> in the middle of town.</li>
+   <li>Every order has a <b>quantity</b> (e.g. 4×C50). You need that many on board to sell.</li><li>Your lorry carries <b>30 units</b>. When stock runs low, park at the <b>⛽ LPG terminal</b> in the middle of town and <b>buy</b> more. Rival lorries must refill there too!</li>
   </ul>
   <table><tr><th>Customer</th><th>Products</th></tr>
   ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip ${p==='C14'?'sub':'com'}">${p}</span>`).join('')}</td></tr>`).join('')}</table>
@@ -454,11 +524,13 @@ function intro(){
 // ================= INPUT =================
 const KEYMAP={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
 addEventListener('keydown',e=>{
-  if(offer&&['1','2','3'].includes(e.key)){const o=OFFERS[+e.key-1];if(!o.cost||G.mkt>=o.cost)chooseOffer(player.cargo[offer.c.req?.product]>0?o.id:'leave');return}
+  if(shop){if(e.key==='Enter'){shopAction('buy');return}if(e.key==='Escape'){shopAction('leave');return}}
+  if(offer&&['1','2','3'].includes(e.key)){const o=OFFERS[+e.key-1];if(!o.cost||G.mkt>=o.cost)chooseOffer(offer.c.req&&player.cargo[offer.c.req.product]>=offer.c.req.qty?o.id:'leave');return}
   if(offer&&e.key==='Escape'){chooseOffer('leave');return}
   const d=KEYMAP[e.key];if(!d)return;e.preventDefault();
   held.add(d);lastKey=d;player.path=[];
   if(offer){offer.c.cool.you=3;hideOffer()}
+  if(shop)hideShop();
 });
 addEventListener('keyup',e=>{const d=KEYMAP[e.key];if(d)held.delete(d)});
 addEventListener('blur',()=>held.clear());
@@ -467,9 +539,9 @@ document.querySelectorAll('#pad button').forEach(b=>{
   b.addEventListener('pointerdown',e=>{e.preventDefault();held.add(d);lastKey=d;player.path=[]});
   ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>held.delete(d)));
 });
-offerEl.addEventListener('click',e=>{const b=e.target.closest('[data-offer]');if(b&&!b.disabled)chooseOffer(b.dataset.offer)});
+offerEl.addEventListener('click',e=>{const s=e.target.closest('[data-shop]');if(s&&!s.disabled){shopAction(s.dataset.shop);return}const b=e.target.closest('[data-offer]');if(b&&!b.disabled)chooseOffer(b.dataset.offer)});
 cv.addEventListener('pointerdown',e=>{
-  if(!G.running||offer)return;
+  if(!G.running||offer||shop)return;
   const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);
   let tx=x,ty=y;
   const c=customers.find(c=>c.x===x&&c.y===y);
@@ -477,7 +549,7 @@ cv.addEventListener('pointerdown',e=>{
   else if(Math.floor(x/4)===depot.bx&&Math.floor(y/4)===depot.by&&!isRoad(x,y)){tx=depot.door.x;ty=depot.door.y}
   else if(!isRoad(x,y))return;
   const sx=player.moving?player.nx:player.x,sy=player.moving?player.ny:player.y;
-  const p=bfs(sx,sy,tx,ty);if(p)player.path=p;
+  const p=bfs(sx,sy,tx,ty);if(p){player.path=p;if(tx===depot.door.x&&ty===depot.door.y)shopDismissed=false}
 });
 
 newGame();updateHud();intro();requestAnimationFrame(frame);
