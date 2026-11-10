@@ -11,6 +11,7 @@ A driving game. You are the **green** company's lorry, racing **blue**, **yellow
 - Deliver 📦 reorders to your own customers on time, or they start looking for another supplier.
 - Your lorry holds 30 units of C14, C14C, C50, F14 and bulk LPG. When you run low, park at the LPG terminal and buy more stock with your cash. Rival lorries have to refill there too.
 - Profit is the selling price minus the terminal buying price.
+- Sound: a cash-register ching on every sale, coin jackpot on new deals, engine noise, and background music that speeds up in the last 30 seconds. Press M or 🔊 to mute.
 - Controls: arrow keys / WASD, tap the map to auto-drive, keys 1–3 to choose offers. On phones there's an on-screen D-pad.
 
 ## ⛽ LPG Dealer Wars (`lpg-dealer-wars/index.html`)

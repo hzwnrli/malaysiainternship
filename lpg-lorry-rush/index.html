@@ -59,6 +59,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <div class="stat">⏱️ <b id="sTime">3:00</b></div>
     <div class="stat">💰 RM <b id="sCash">0</b></div>
     <div class="stat">📣 Marketing budget RM <b id="sMkt">0</b></div>
+    <button id="mute" title="Sound on/off (M)" style="padding:4px 10px">🔊</button>
   </div>
   <div id="board"></div>
   <div id="cargo"></div>
@@ -71,7 +72,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <button class="down" data-d="down">▼</button><button class="right" data-d="right">▶</button>
   </div>
   <div class="help">
-    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 30 units).<br>
+    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 30 units).<br>
     💬 white bubble = new customer · 🟠 orange = wants to switch supplier · 📦 = your customer reordering (deliver fast!).<br>
     Products: <span class="chip sub">C14</span> subsidised, households only · <span class="chip com">C14C</span> <span class="chip com">C50</span> <span class="chip com">F14</span> <span class="chip com">BULK</span> commercial. Game numbers are not real prices.
   </div>
@@ -131,6 +132,95 @@ const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), fmt=n=>Math.round(n).toLocaleString('en-MY');
 const isRoad=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&(x%4===0||y%4===0);
 const key=(x,y)=>y*W+x;
+
+
+// ================= SOUND (Web Audio, no files needed) =================
+const SFX={
+  ctx:null,master:null,muted:false,eng:null,engGain:null,musicGain:null,nextBeat:0,step:0,
+  init(){
+    try{this.muted=localStorage.getItem('lpgMute')==='1'}catch(e){}
+    const mb=document.getElementById('mute');if(mb)mb.textContent=this.muted?'🔇':'🔊';
+    if(this.ctx){this.ctx.resume&&this.ctx.resume();return}
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+    this.ctx=new C(); this.master=this.ctx.createGain(); this.master.gain.value=this.muted?0:.55; this.master.connect(this.ctx.destination);
+    // engine: two detuned saws through a low-pass filter
+    const f=this.ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=380;
+    this.engGain=this.ctx.createGain();this.engGain.gain.value=0;f.connect(this.engGain);this.engGain.connect(this.master);
+    this.eng=[0,1].map(i=>{const o=this.ctx.createOscillator();o.type='sawtooth';o.frequency.value=48+i*3;o.connect(f);o.start();return o});
+    this.musicGain=this.ctx.createGain();this.musicGain.gain.value=.22;this.musicGain.connect(this.master);
+    this.nextBeat=this.ctx.currentTime+.1;
+  },
+  setMuted(m){this.muted=m;try{localStorage.setItem('lpgMute',m?'1':'0')}catch(e){}
+    if(this.master)this.master.gain.setTargetAtTime(m?0:.55,this.ctx.currentTime,.02);
+    const b=document.getElementById('mute');if(b)b.textContent=m?'🔇':'🔊'},
+  tone(freq,dur,{type='square',vol=.2,when=0,slide=0,dest=null}={}){
+    if(!this.ctx)return; const t=this.ctx.currentTime+when,o=this.ctx.createOscillator(),g=this.ctx.createGain();
+    o.type=type;o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq*slide),t+dur);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.008);g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+    o.connect(g);g.connect(dest||this.master);o.start(t);o.stop(t+dur+.05);
+  },
+  noise(dur,{vol=.2,when=0,freq=3000,q=1,dest=null}={}){
+    if(!this.ctx)return; const t=this.ctx.currentTime+when,len=Math.ceil(this.ctx.sampleRate*dur),buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+    const src=this.ctx.createBufferSource(),flt=this.ctx.createBiquadFilter(),g=this.ctx.createGain();
+    src.buffer=buf;flt.type='bandpass';flt.frequency.value=freq;flt.Q.value=q;
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+    src.connect(flt);flt.connect(g);g.connect(dest||this.master);src.start(t);
+  },
+  // 💰 cash register "ka-CHING"
+  ching(){
+    this.noise(.06,{vol:.35,freq:2500,q:.8});                          // drawer "ka"
+    this.tone(2093,.5,{type:'triangle',vol:.28,when:.06});              // bell
+    this.tone(2637,.7,{type:'triangle',vol:.22,when:.1});
+    this.tone(4186,.6,{type:'sine',vol:.08,when:.1});
+  },
+  // 🎉 big deal: ching + falling coins + rising arpeggio
+  jackpot(){
+    this.ching();
+    [523,659,784,1047,1319].forEach((f,i)=>this.tone(f,.18,{type:'square',vol:.09,when:.15+i*.06}));
+    for(let i=0;i<7;i++)this.tone(rnd(2600,4200),.12,{type:'triangle',vol:.1,when:.25+i*.055+Math.random()*.02});
+  },
+  register(){this.noise(.08,{vol:.3,freq:900,q:2});this.tone(180,.12,{type:'square',vol:.15,when:.05});this.tone(1568,.35,{type:'triangle',vol:.18,when:.12})},
+  fail(){this.tone(220,.35,{type:'sawtooth',vol:.18,slide:.5});this.tone(165,.4,{type:'sawtooth',vol:.12,when:.08,slide:.5})},
+  alarm(){for(let i=0;i<3;i++){this.tone(880,.12,{type:'square',vol:.14,when:i*.24});this.tone(622,.12,{type:'square',vol:.14,when:i*.24+.12})}},
+  ping(){this.tone(1046,.12,{type:'sine',vol:.2});this.tone(1568,.2,{type:'sine',vol:.18,when:.08})},
+  pop(){this.tone(660,.07,{type:'sine',vol:.08,slide:1.6})},
+  tick(hi){this.tone(hi?1800:1200,.05,{type:'square',vol:.1})},
+  horn(){this.tone(311,.25,{type:'sawtooth',vol:.12});this.tone(392,.25,{type:'sawtooth',vol:.1})},
+  fanfare(win){
+    const n=win?[523,659,784,1047,784,1047,1319]:[392,370,349,330,311,294];
+    n.forEach((f,i)=>this.tone(f,win?.22:.3,{type:'square',vol:.14,when:i*(win?.12:.2)}));
+    if(win)setTimeout(()=>this.jackpot(),900);
+  },
+  // engine pitch follows the lorry; music tempo rises as time runs out
+  update(moving,running,timeLeft){
+    if(!this.ctx)return; const t=this.ctx.currentTime;
+    this.engGain.gain.setTargetAtTime(running?(moving?.09:.03):0,t,.08);
+    this.eng.forEach((o,i)=>o.frequency.setTargetAtTime((moving?72:46)+i*3,t,.15));
+    if(!running)return;
+    const rush=timeLeft<30, bpm=rush?168:132+Math.min(24,(GAME_TIME-timeLeft)/6), spb=60/bpm/2;
+    const bass=rush?[55,55,82,55,65,55,98,82]:[55,0,55,82,65,0,73,82];
+    const lead=[0,659,0,784,0,880,784,0,659,0,587,0,659,0,0,0];
+    while(this.nextBeat<t+.15){
+      const w=this.nextBeat-t,s=this.step++%16;
+      if(bass[s%8])this.tone(bass[s%8],spb*.9,{type:'sawtooth',vol:.5,when:w,dest:this.musicGain});
+      if(s%4===0)this.tone(110,.12,{type:'sine',vol:.9,when:w,slide:.4,dest:this.musicGain});        // kick
+      if(s%2===1)this.noise(.03,{vol:.25,when:w,freq:8000,dest:this.musicGain});                   // hi-hat
+      if(s%8===4)this.noise(.1,{vol:.35,when:w,freq:1800,q:.7,dest:this.musicGain});               // snare
+      if(rush&&lead[s])this.tone(lead[s]*2,spb*.8,{type:'square',vol:.12,when:w,dest:this.musicGain});
+      this.nextBeat+=spb;
+    }
+    if(this.nextBeat<t)this.nextBeat=t+.05;
+  },
+};
+
+// floating "+RM" texts and coin particles
+let floaters=[];
+function floatText(x,y,text,color='#facc15',coins=0){
+  floaters.push({x,y,text,color,t:0,life:1.4});
+  for(let i=0;i<coins;i++)floaters.push({x,y,coin:true,vx:rnd(-60,60),vy:rnd(-160,-80),t:0,life:.9});
+}
+const cpos=c=>[c.x*T+T/2,c.y*T];
 
 // ================= STATE =================
 let G, customers, lorries, player, depot, reqTimer, offer, shop=null, shopDismissed=false, bg;
@@ -195,7 +285,7 @@ function expireRequest(c){
   const r=c.req; c.req=null;
   if(r.kind==='reorder'){
     // owner failed to deliver → customer unhappy, open for everyone
-    if(c.owner==='you')toast(`😠 ${c.name} waited too long! They're shopping around…`,'bad');
+    if(c.owner==='you'){toast(`😠 ${c.name} waited too long! They're shopping around…`,'bad');SFX.alarm()}
     c.loyal=false; c.req={kind:'switch',product:r.product,qty:r.qty,t:15,max:15,unhappy:true}; c.cool={};
   }
 }
@@ -230,10 +320,10 @@ function arrive(l){
   if(r.kind==='reorder'){
     if(c.owner!==l.co)return;
     if(l.co==='you'){
-      if(l.cargo[r.product]<r.qty){toast(`Need ${r.qty}× ${r.product} but only ${l.cargo[r.product]} on board! Buy more at the ⛽ terminal.`,'bad');return}
+      if(l.cargo[r.product]<r.qty){toast(`Need ${r.qty}× ${r.product} but only ${l.cargo[r.product]} on board! Buy more at the ⛽ terminal.`,'bad');SFX.fail();return}
     } else if(l.load<r.qty)return;
     const earn=sell(l.co,c,c.margin);
-    if(l.co==='you'){G.mkt+=20;toast(`📦 Delivered ${r.qty}× ${r.product} to ${c.name} +RM${fmt(earn)} · +RM20 marketing budget`,'good');updateHud()}
+    if(l.co==='you'){G.mkt+=20;SFX.ching();floatText(...cpos(c),`+RM${fmt(earn)}`,'#facc15',6);toast(`📦 Delivered ${r.qty}× ${r.product} to ${c.name} +RM${fmt(earn)} · +RM20 marketing budget`,'good');updateHud()}
     c.req=null; return;
   }
   // open opportunity
@@ -246,8 +336,8 @@ function arrive(l){
   if(l.load<r.qty)return;
   if(Math.random()*100<chance(l,c)){
     const {prev}=win(l.co,c,1,false);
-    if(offer&&offer.c===c){hideOffer();toast(`Too slow! ${COMPANIES[l.co].name} closed the deal at ${c.name}.`,'bad')}
-    else if(prev==='you')toast(`😡 ${COMPANIES[l.co].name} took ${c.name} from you!`,'bad');
+    if(offer&&offer.c===c){hideOffer();toast(`Too slow! ${COMPANIES[l.co].name} closed the deal at ${c.name}.`,'bad');SFX.fail()}
+    else if(prev==='you'){toast(`😡 ${COMPANIES[l.co].name} took ${c.name} from you!`,'bad');SFX.alarm();floatText(...cpos(c),'STOLEN!','#f87171')}
   } else c.cool[l.co]=6;
 }
 
@@ -255,7 +345,7 @@ function arrive(l){
 const offerEl=document.getElementById('offer');
 function openOffer(c){
   player.halt=true; player.path=[];
-  offer={c,t:5,max:5}; renderOffer();
+  offer={c,t:5,max:5,lastTick:5}; renderOffer(); SFX.ping();
 }
 function renderOffer(){
   if(!offer)return; const c=offer.c,r=c.req,ty=TYPES[c.type];
@@ -275,8 +365,9 @@ function chooseOffer(id){
   G.mkt-=o.cost;
   if(Math.random()*100<chance(player,c,id)){
     const r=c.req, {prev,earn}=win('you',c,o.margin,id==='tm');
+    SFX.jackpot();floatText(...cpos(c),`+RM${fmt(earn)}`,'#facc15',14);
     toast(`🎉 Deal! ${c.name} is now a Green Gas customer${prev?` (won from ${COMPANIES[prev].short})`:''} · sold ${r.qty}× ${r.product} +RM${fmt(earn)}`,'good');
-  } else {c.cool.you=5;toast(`❌ ${c.name} said no. Try again in a few seconds.`,'bad')}
+  } else {c.cool.you=5;toast(`❌ ${c.name} said no. Try again in a few seconds.`,'bad');SFX.fail()}
   hideOffer(); updateHud();
 }
 function hideOffer(){offer=null;offerEl.style.display='none';if(player)player.halt=false}
@@ -291,7 +382,7 @@ function suggestBuy(){
   while(cost()>G.cash){const k=PRODS.filter(k=>b[k]>0).sort((x,y)=>PRICE[y].buy-PRICE[x].buy)[0];if(!k)break;b[k]--}
   return b;
 }
-function openShop(){player.halt=true;player.path=[];shop={buy:suggestBuy()};renderShop()}
+function openShop(){SFX.horn();player.halt=true;player.path=[];shop={buy:suggestBuy()};renderShop()}
 function shopCost(){return PRODS.reduce((s,k)=>s+shop.buy[k]*PRICE[k].buy,0)}
 function renderShop(){
   if(!shop)return;
@@ -311,12 +402,13 @@ function shopAction(a){
   if(!shop)return;
   const [act,k]=a.split(':');
   const free=CAP-loadOf(player.cargo)-PRODS.reduce((s,k)=>s+shop.buy[k],0);
-  if(act==='plus'&&free>0&&shopCost()+PRICE[k].buy<=G.cash)shop.buy[k]++;
+  if(act==='plus'&&free>0&&shopCost()+PRICE[k].buy<=G.cash){shop.buy[k]++;SFX.pop()}
   else if(act==='minus'&&shop.buy[k]>0)shop.buy[k]--;
   else if(act==='fill')shop.buy=suggestBuy();
   else if(act==='clear')PRODS.forEach(k=>shop.buy[k]=0);
   else if(act==='buy'){const cost=shopCost();if(cost>G.cash)return;
     PRODS.forEach(k=>player.cargo[k]+=shop.buy[k]);G.cash-=cost;G.spent+=cost;
+    SFX.register();floatText(player.x*T+T/2,player.y*T,`−RM${fmt(cost)}`,'#f87171');
     toast(`⛽ Bought stock for RM${fmt(cost)} · lorry ${loadOf(player.cargo)}/${CAP}`,'good');return hideShop()}
   else if(act==='leave')return hideShop();
   renderShop();updateHud();
@@ -381,7 +473,8 @@ function frame(ts){
   const dt=Math.min(.05,(ts-last)/1000||0);last=ts;
   if(G.running&&!G.over){
     G.time-=dt;G.elapsed+=dt;
-    reqTimer-=dt;if(reqTimer<=0){spawnRequest();reqTimer=Math.max(1.1,2.4-G.elapsed/120)}
+    if(G.time<10&&Math.ceil(G.time)!==G.lastSec){G.lastSec=Math.ceil(G.time);SFX.tick(true)}
+    reqTimer-=dt;if(reqTimer<=0){spawnRequest();SFX.pop();reqTimer=Math.max(1.1,2.4-G.elapsed/120)}
     for(const c of customers){
       for(const k in c.cool)c.cool[k]-=dt;
       if(c.req){c.req.t-=dt;if(c.req.t<=0)expireRequest(c)}
@@ -392,10 +485,14 @@ function frame(ts){
     else if(!shopDismissed&&!shop&&!offer&&!held.size&&!player.path.length)openShop();
     if(offer){offer.t-=dt;const b=document.getElementById('otimer');if(b)b.style.width=Math.max(0,offer.t/offer.max*100)+'%';
       if(!offer.c.req||(offer.c.owner&&offer.c.owner!=='you'&&!offer.c.req)){hideOffer()}
-      else if(offer.t<=0){offer.c.cool.you=4;toast('⌛ Too slow – the customer walked away.','bad');hideOffer()}}
+      else if(offer.t<=0){offer.c.cool.you=4;toast('⌛ Too slow – the customer walked away.','bad');SFX.fail();hideOffer()}
+      else if(Math.ceil(offer.t)<offer.lastTick){offer.lastTick=Math.ceil(offer.t);SFX.tick(offer.t<2)}}
     if(G.time<=0)endGame();
     hudTick+=dt;if(hudTick>.25){hudTick=0;updateHud()}
   }
+  SFX.update(player.moving&&!player.halt,G.running&&!G.over,G.time);
+  for(const f of floaters){f.t+=dt;if(f.coin){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=420*dt}}
+  floaters=floaters.filter(f=>f.t<f.life);
   draw();requestAnimationFrame(frame);
 }
 let hudTick=0;
@@ -462,6 +559,12 @@ function draw(){
     for(const [x,y] of player.path)ctx.lineTo(x*T+T/2,y*T+T/2);ctx.stroke();ctx.setLineDash([])}
   // lorries
   for(const l of lorries)drawLorry(l);
+  // floating money
+  for(const f of floaters){const a=1-f.t/f.life;ctx.globalAlpha=Math.max(0,a);
+    if(f.coin){ctx.fillStyle='#facc15';ctx.beginPath();ctx.arc(f.x,f.y,4,0,7);ctx.fill();ctx.strokeStyle='#a16207';ctx.lineWidth=1;ctx.stroke()}
+    else{const sc=1+Math.min(.4,f.t*2);ctx.font=`900 ${Math.round(16*sc)}px system-ui`;ctx.lineWidth=4;ctx.strokeStyle='#000';
+      ctx.strokeText(f.text,f.x,f.y-f.t*40);ctx.fillStyle=f.color;ctx.fillText(f.text,f.x,f.y-f.t*40)}}
+  ctx.globalAlpha=1;
 }
 function drawLorry(l){
   const cx=l.x*T+T/2,cy=l.y*T+T/2,col=COMPANIES[l.co].color;
@@ -499,12 +602,13 @@ function endGame(){
   const rows=Object.entries(COMPANIES).map(([k,c])=>({k,...c,n:customers.filter(x=>x.owner===k).length,m:G.money[k]}))
     .map(r=>({...r,score:Math.round(r.m+r.n*60)})).sort((a,b)=>b.score-a.score);
   const rank=rows.findIndex(r=>r.k==='you')+1;
+  SFX.update(false,false,0);SFX.fanfare(rank===1);
   modal(`<h2>${rank===1?'🏆 Green Gas wins the town!':rank===2?'🥈 So close!':'📉 The rivals out-drove you'}</h2>
    <p>You finished <b>#${rank}</b>. Score = gross profit (sales minus terminal price) + RM60 per customer you hold at the end. You finished with RM${fmt(G.cash)} cash.</p>
    <table><tr><th>Company</th><th>Customers</th><th>Profit</th><th>Score</th></tr>
    ${rows.map(r=>`<tr><td style="color:${r.color}"><b>${r.name}</b></td><td>${r.n}</td><td>RM${fmt(r.m)}</td><td><b>${fmt(r.score)}</b></td></tr>`).join('')}</table>
    <p class="muted">Tips: plan your route, buy the right mix at the terminal so you have enough for big orders, use trade marketing on big customers so rivals can't steal them, and never miss a 📦 reorder.</p>
-   <button class="primary" onclick="closeModal();newGame();G.running=true">Play again</button>`);
+   <button class="primary" onclick="SFX.init();closeModal();newGame();G.running=true">Play again</button>`);
 }
 function intro(){
   modal(`<h2>🚚 LPG Lorry Rush</h2>
@@ -518,7 +622,7 @@ function intro(){
   <table><tr><th>Customer</th><th>Products</th></tr>
   ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip ${p==='C14'?'sub':'com'}">${p}</span>`).join('')}</td></tr>`).join('')}</table>
   <p class="muted" style="font-size:12px">Drive with arrow keys / WASD, or tap the map to auto-drive.</p>
-  <button class="primary" onclick="closeModal();G.running=true">Start driving ▶</button>`);
+  <button class="primary" onclick="SFX.init();SFX.horn();closeModal();G.running=true">Start driving ▶</button>`);
 }
 
 // ================= INPUT =================
@@ -527,11 +631,13 @@ addEventListener('keydown',e=>{
   if(shop){if(e.key==='Enter'){shopAction('buy');return}if(e.key==='Escape'){shopAction('leave');return}}
   if(offer&&['1','2','3'].includes(e.key)){const o=OFFERS[+e.key-1];if(!o.cost||G.mkt>=o.cost)chooseOffer(offer.c.req&&player.cargo[offer.c.req.product]>=offer.c.req.qty?o.id:'leave');return}
   if(offer&&e.key==='Escape'){chooseOffer('leave');return}
+  if(e.key==='m'||e.key==='M'){SFX.init();SFX.setMuted(!SFX.muted);return}
   const d=KEYMAP[e.key];if(!d)return;e.preventDefault();
   held.add(d);lastKey=d;player.path=[];
   if(offer){offer.c.cool.you=3;hideOffer()}
   if(shop)hideShop();
 });
+document.getElementById('mute').onclick=()=>{SFX.init();SFX.setMuted(!SFX.muted)};
 addEventListener('keyup',e=>{const d=KEYMAP[e.key];if(d)held.delete(d)});
 addEventListener('blur',()=>held.clear());
 document.querySelectorAll('#pad button').forEach(b=>{
