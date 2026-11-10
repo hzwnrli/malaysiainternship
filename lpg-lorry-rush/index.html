@@ -18,8 +18,11 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .stat b{color:#fff}
 #board{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .co{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:8px;padding:3px 10px;font-size:12px;border-left:5px solid}
-#cargo{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;font-size:12px}
-.cg{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+#cargo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:13px;background:var(--panel);border:2px solid var(--green);border-radius:12px;padding:8px 10px}
+#cargo .ttl{font-weight:800;color:var(--good);margin-right:4px}
+#cargo .cash{font-size:16px;font-weight:800;color:#facc15;margin-right:8px}
+.cyl{display:inline-block;width:9px;height:15px;border-radius:4px 4px 3px 3px;background:var(--c);border:1px solid #0009;vertical-align:-3px;margin-right:4px;box-shadow:inset -2px 0 0 #0003}
+.cg{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px 9px}
 .cg.empty{border-color:var(--bad);color:var(--bad)}
 .stage{position:relative}
 canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3a;touch-action:none}
@@ -57,12 +60,12 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
   <div id="hud">
     <div class="brand">🚚 LPG Lorry Rush</div>
     <div class="stat">⏱️ <b id="sTime">3:00</b></div>
-    <div class="stat">💰 RM <b id="sCash">0</b></div>
+    <span id="sCash" hidden></span>
     <div class="stat">📣 Marketing budget RM <b id="sMkt">0</b></div>
     <button id="mute" title="Sound on/off (M)" style="padding:4px 10px">🔊</button>
   </div>
   <div id="board"></div>
-  <div id="cargo"></div>
+  <div id="cargo" class="mystock"></div>
   <div class="stage">
     <canvas id="c" width="800" height="544"></canvas>
     <div id="offer"></div>
@@ -72,9 +75,9 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <button class="down" data-d="down">▼</button><button class="right" data-d="right">▶</button>
   </div>
   <div class="help">
-    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 30 units).<br>
+    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 30 cylinders).<br>
     💬 white bubble = new customer · 🟠 orange = wants to switch supplier · 📦 = your customer reordering (deliver fast!).<br>
-    Products: <span class="chip sub">C14</span> subsidised, households only · <span class="chip com">C14C</span> <span class="chip com">C50</span> <span class="chip com">F14</span> <span class="chip com">BULK</span> commercial. Game numbers are not real prices.
+    Cylinders: <span class="cyl" style="--c:#22c55e"></span><b>C14</b> green = subsidised, households only · <span class="cyl" style="--c:#a855f7"></span><b>C14C</b> purple · <span class="cyl" style="--c:#ffffff"></span><b>C50</b> white · <span class="cyl" style="--c:#c0c4cc"></span><b>F14</b> silver = commercial. Game numbers are not real prices.
   </div>
 </div>
 <div class="overlay" id="modalWrap"><div class="modal" id="modal"></div></div>
@@ -94,9 +97,9 @@ const TYPES={
   household:{name:'Household',icon:'🏠',prod:['C14'],qty:{C14:[1,2]},profit:12,base:62,w:34},
   restaurant:{name:'Restaurant',icon:'🍜',prod:['C14C','C50'],qty:{C14C:[2,5],C50:[1,3]},profit:40,base:52,w:20},
   lobby:{name:'Lobby / Café',icon:'☕',prod:['C14C'],qty:{C14C:[1,3]},profit:28,base:56,w:12},
-  hotel:{name:'Hotel',icon:'🏨',prod:['C50','BULK'],qty:{C50:[2,4],BULK:[2,4]},profit:85,base:42,w:12},
-  mall:{name:'Hospitality Mall',icon:'🏬',prod:['BULK','C50'],qty:{BULK:[3,6],C50:[3,5]},profit:120,base:36,w:8},
-  factory:{name:'Manufacturing',icon:'🏭',prod:['F14','BULK','C50'],qty:{F14:[3,6],BULK:[3,6],C50:[2,4]},profit:150,base:32,w:14},
+  hotel:{name:'Hotel',icon:'🏨',prod:['C50','C14C'],qty:{C50:[2,4],C14C:[3,6]},profit:85,base:42,w:12},
+  mall:{name:'Hospitality Mall',icon:'🏬',prod:['C50','C14C'],qty:{C50:[3,6],C14C:[4,8]},profit:120,base:36,w:8},
+  factory:{name:'Manufacturing',icon:'🏭',prod:['F14','C50'],qty:{F14:[3,6],C50:[2,4]},profit:150,base:32,w:14},
 };
 const NAMES={
   household:['Taman Melur','Taman Sri Muda','Kg. Baru','Taman Bukit Indah','Taman Seroja','Desa Aman','Taman Cempaka','Kg. Padang','Taman Mawar','Taman Orkid','Taman Dahlia','Kg. Sungai Ara','Taman Bayu','Taman Kasturi'],
@@ -106,17 +109,19 @@ const NAMES={
   mall:['Mutiara City Mall','Galeria Sentosa','Plaza Harmoni','Sinar Avenue Mall'],
   factory:['Kilang Plastik Jaya','Maju Steel Works','Sinar Food Processing','Delta Glass','Perkasa Ceramics','Bintang Packaging'],
 };
-const CAP=30; // lorry capacity in units (1 cylinder or 1 bulk unit = 1)
-const PRODS=['C14','C14C','C50','F14','BULK'];
+const CAP=30; // lorry capacity in cylinders
+const PRODS=['C14','C14C','C50','F14'];
+const PCOL={C14:'#22c55e',C14C:'#a855f7',C50:'#ffffff',F14:'#c0c4cc'}; // cylinder colours
+const cyl=(k,n)=>`<span class="cyl" style="--c:${PCOL[k]}"></span><b>${k}</b>${n!=null?` ×${n}`:''}`;
 const PRICE={ // game prices per unit (not real prices)
   C14:{buy:20,sell:27,label:'C14 14kg subsidised'},
   C14C:{buy:45,sell:62,label:'C14C 14kg commercial'},
   C50:{buy:160,sell:215,label:'C50 50kg commercial'},
   F14:{buy:50,sell:70,label:'F14 14kg forklift'},
-  BULK:{buy:200,sell:270,label:'BULK LPG (100kg unit)'},
 };
-const MIX={C14:.2,C14C:.25,C50:.2,F14:.15,BULK:.2};
-const START_CARGO={C14:4,C14C:4,C50:3,F14:2,BULK:2};
+const MIX={C14:.3,C14C:.3,C50:.22,F14:.18};
+const START_CARGO={C14:5,C14C:5,C50:4,F14:3};
+const START_CASH=10000;
 const loadOf=cg=>PRODS.reduce((s,k)=>s+cg[k],0);
 const rint=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const saleValue=(prod,qty,margin)=>qty*PRICE[prod].sell*margin;
@@ -229,7 +234,7 @@ const held=new Set(); let lastKey=null;
 function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Math.random()*tot;for(const k in TYPES){r-=TYPES[k].w;if(r<=0)return k}return 'household'}
 
 function newGame(){
-  G={spent:0,time:GAME_TIME,cash:1000,mkt:300,running:false,over:false,elapsed:0,money:{you:0,blue:0,yellow:0,red:0}};
+  G={spent:0,time:GAME_TIME,mkt:300,running:false,over:false,elapsed:0,money:{you:START_CASH,blue:START_CASH,yellow:START_CASH,red:START_CASH},profit:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
   depot={bx:3,by:2}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
   for(let by=0;by<4;by++)for(let bx=0;bx<6;bx++){
@@ -249,7 +254,7 @@ function newGame(){
   pool.filter(c=>c.type==='household').slice(0,2).forEach(c=>c.owner='you');
   ['blue','yellow','red'].forEach(co=>{let k=0;for(const c of pool){if(!c.owner&&k<3){c.owner=co;k++}}});
   // lorries
-  const mk=(co,x,y,speed)=>({co,x,y,nx:x,ny:y,moving:false,dir:DIRS.right,speed,path:[],target:null,cargo:{...START_CARGO},load:20,halt:false,think:0});
+  const mk=(co,x,y,speed)=>({co,x,y,nx:x,ny:y,moving:false,dir:DIRS.right,speed,path:[],target:null,cargo:{...START_CARGO},halt:false,think:0});
   player=mk('you',depot.door.x,depot.door.y,4.3);
   lorries=[player,mk('blue',0,0,3.1),mk('yellow',W-1,0,3.25),mk('red',0,H-1,3.4)];
   reqTimer=1; offer=null; shop=null; shopDismissed=true; bg=null;
@@ -301,9 +306,9 @@ function chance(lorry,c,offerId){
 }
 function sell(co,c,margin){
   const r=c.req, earn=saleValue(r.product,r.qty,margin);
-  G.money[co]+=saleProfit(r.product,r.qty,margin);
+  G.profit[co]+=saleProfit(r.product,r.qty,margin);
   const l=lorries.find(l=>l.co===co);
-  if(co==='you'){G.cash+=earn;l.cargo[r.product]-=r.qty}else l.load-=r.qty;
+  G.money[co]+=earn; l.cargo[r.product]-=r.qty;
   return earn;
 }
 function win(co,c,margin,loyal){
@@ -313,7 +318,8 @@ function win(co,c,margin,loyal){
 }
 function arrive(l){
   // rivals refill at the terminal
-  if(l!==player&&l.x===depot.door.x&&l.y===depot.door.y){l.load=CAP;l.target=null}
+  if(l!==player&&l.x===depot.door.x&&l.y===depot.door.y){
+    const b=suggestFor(l.cargo,G.money[l.co]);PRODS.forEach(k=>l.cargo[k]+=b[k]);G.money[l.co]-=costOf(b);l.target=null}
   const c=customers.find(c=>c.req&&c.door.x===l.x&&c.door.y===l.y);
   if(!c)return;
   const r=c.req;
@@ -321,7 +327,7 @@ function arrive(l){
     if(c.owner!==l.co)return;
     if(l.co==='you'){
       if(l.cargo[r.product]<r.qty){toast(`Need ${r.qty}× ${r.product} but only ${l.cargo[r.product]} on board! Buy more at the ⛽ terminal.`,'bad');SFX.fail();return}
-    } else if(l.load<r.qty)return;
+    } else if(l.cargo[r.product]<r.qty)return;
     const earn=sell(l.co,c,c.margin);
     if(l.co==='you'){G.mkt+=20;SFX.ching();floatText(...cpos(c),`+RM${fmt(earn)}`,'#facc15',6);toast(`📦 Delivered ${r.qty}× ${r.product} to ${c.name} +RM${fmt(earn)} · +RM20 marketing budget`,'good');updateHud()}
     c.req=null; return;
@@ -333,7 +339,7 @@ function arrive(l){
     if(!shop)openOffer(c); return;
   }
   if(c.owner===l.co&&!r.unhappy)return;
-  if(l.load<r.qty)return;
+  if(l.cargo[r.product]<r.qty)return;
   if(Math.random()*100<chance(l,c)){
     const {prev}=win(l.co,c,1,false);
     if(offer&&offer.c===c){hideOffer();toast(`Too slow! ${COMPANIES[l.co].name} closed the deal at ${c.name}.`,'bad');SFX.fail()}
@@ -352,7 +358,7 @@ function renderOffer(){
   const have=player.cargo[r.product], enough=have>=r.qty;
   offerEl.style.display='block';
   offerEl.innerHTML=`<h3>${ty.icon} ${c.name}</h3>
-   <div class="muted">${ty.name} orders <b>${r.qty}× ${r.product}</b> (RM${fmt(saleValue(r.product,r.qty,1))}) · on board: <b class="${enough?'good':'bad'}">${have}</b>${c.owner&&c.owner!=='you'?` · current supplier <b style="color:${COMPANIES[c.owner].color}">${COMPANIES[c.owner].short}</b>`:''}${r.unhappy?' · <span class="warn">unhappy – easier to win</span>':''}</div>
+   <div class="muted">${ty.name} orders <b>${r.qty}× ${cyl(r.product)}</b> (RM${fmt(saleValue(r.product,r.qty,1))}) · on board: <b class="${enough?'good':'bad'}">${have}</b>${c.owner&&c.owner!=='you'?` · current supplier <b style="color:${COMPANIES[c.owner].color}">${COMPANIES[c.owner].short}</b>`:''}${r.unhappy?' · <span class="warn">unhappy – easier to win</span>':''}</div>
    <div class="timer"><i id="otimer" style="width:${offer.t/offer.max*100}%"></i></div>
    ${enough?`<div class="opts">${OFFERS.map((o,i)=>`<button data-offer="${o.id}" ${o.cost>G.mkt?'disabled':''}><span class="pct">${chance(player,c,o.id)}%</span><b>${i+1}. ${o.name}</b>${o.desc}</button>`).join('')}</div>`
    :`<p class="bad">Not enough ${r.product}: they need ${r.qty}, you have ${have}. Buy more at the ⛽ LPG terminal!</p><button data-offer="leave">Leave</button>`}`;
@@ -373,13 +379,15 @@ function chooseOffer(id){
 function hideOffer(){offer=null;offerEl.style.display='none';if(player)player.halt=false}
 
 // ================= TERMINAL (buy stock) =================
-function suggestBuy(){
-  const free=CAP-loadOf(player.cargo), b={};
-  PRODS.forEach(k=>b[k]=Math.floor(free*MIX[k]));
-  b.C14C+=free-PRODS.reduce((s,k)=>s+b[k],0);
-  // trim until affordable
-  const cost=()=>PRODS.reduce((s,k)=>s+b[k]*PRICE[k].buy,0);
-  while(cost()>G.cash){const k=PRODS.filter(k=>b[k]>0).sort((x,y)=>PRICE[y].buy-PRICE[x].buy)[0];if(!k)break;b[k]--}
+const costOf=b=>PRODS.reduce((s,k)=>s+b[k]*PRICE[k].buy,0);
+function suggestBuy(){return suggestFor(player.cargo,G.money.you)}
+function suggestFor(cargo,cash){
+  // top up towards a balanced load of CAP cylinders, within the cash available
+  const b={};PRODS.forEach(k=>b[k]=Math.max(0,Math.round(CAP*MIX[k])-cargo[k]));
+  let over=loadOf(cargo)+PRODS.reduce((s,k)=>s+b[k],0)-CAP;
+  while(over-->0){const k=PRODS.filter(k=>b[k]>0).sort((x,y)=>b[y]-b[x])[0];if(!k)break;b[k]--}
+  const cost=()=>costOf(b);
+  while(cost()>cash){const k=PRODS.filter(k=>b[k]>0).sort((x,y)=>PRICE[y].buy-PRICE[x].buy)[0];if(!k)break;b[k]--}
   return b;
 }
 function openShop(){SFX.horn();player.halt=true;player.path=[];shop={buy:suggestBuy()};renderShop()}
@@ -389,27 +397,27 @@ function renderShop(){
   const cur=loadOf(player.cargo),add=PRODS.reduce((s,k)=>s+shop.buy[k],0),cost=shopCost();
   offerEl.style.display='block';
   offerEl.innerHTML=`<h3>⛽ LPG Terminal – buy stock</h3>
-   <div class="muted">Lorry capacity: <b>${cur+add}/${CAP}</b> units after purchase · Cash RM${fmt(G.cash)}</div>
-   <table class="shop">${PRODS.map(k=>`<tr><td><b>${k}</b><br><small class="muted">buy RM${PRICE[k].buy} · sell RM${PRICE[k].sell}</small></td>
+   <div class="muted">Lorry: <b>${cur+add}/${CAP}</b> cylinders after purchase · Cash RM${fmt(G.money.you)}</div>
+   <table class="shop">${PRODS.map(k=>`<tr><td>${cyl(k)}<br><small class="muted">buy RM${PRICE[k].buy} · sell RM${PRICE[k].sell}</small></td>
      <td class="muted">on board ${player.cargo[k]}</td>
      <td style="white-space:nowrap"><button data-shop="minus:${k}">−</button> <b style="display:inline-block;width:22px;text-align:center">${shop.buy[k]}</b> <button data-shop="plus:${k}">+</button></td></tr>`).join('')}</table>
-   <div style="margin:6px 0">Total: <b class="${cost>G.cash?'bad':''}">RM${fmt(cost)}</b></div>
+   <div style="margin:6px 0">Total: <b class="${cost>G.money.you?'bad':''}">RM${fmt(cost)}</b></div>
    <div style="display:flex;gap:6px;flex-wrap:wrap">
-     <button class="primary" data-shop="buy" ${cost>G.cash||!add?'disabled':''}>Buy & go (Enter)</button>
+     <button class="primary" data-shop="buy" ${cost>G.money.you||!add?'disabled':''}>Buy & go (Enter)</button>
      <button data-shop="fill">Fill evenly</button><button data-shop="clear">Clear</button><button data-shop="leave">Leave (Esc)</button></div>`;
 }
 function shopAction(a){
   if(!shop)return;
   const [act,k]=a.split(':');
   const free=CAP-loadOf(player.cargo)-PRODS.reduce((s,k)=>s+shop.buy[k],0);
-  if(act==='plus'&&free>0&&shopCost()+PRICE[k].buy<=G.cash){shop.buy[k]++;SFX.pop()}
+  if(act==='plus'&&free>0&&shopCost()+PRICE[k].buy<=G.money.you){shop.buy[k]++;SFX.pop()}
   else if(act==='minus'&&shop.buy[k]>0)shop.buy[k]--;
   else if(act==='fill')shop.buy=suggestBuy();
   else if(act==='clear')PRODS.forEach(k=>shop.buy[k]=0);
-  else if(act==='buy'){const cost=shopCost();if(cost>G.cash)return;
-    PRODS.forEach(k=>player.cargo[k]+=shop.buy[k]);G.cash-=cost;G.spent+=cost;
+  else if(act==='buy'){const cost=shopCost();if(cost>G.money.you)return;
+    PRODS.forEach(k=>player.cargo[k]+=shop.buy[k]);G.money.you-=cost;G.spent+=cost;
     SFX.register();floatText(player.x*T+T/2,player.y*T,`−RM${fmt(cost)}`,'#f87171');
-    toast(`⛽ Bought stock for RM${fmt(cost)} · lorry ${loadOf(player.cargo)}/${CAP}`,'good');return hideShop()}
+    toast(`⛽ Bought stock for RM${fmt(cost)} · lorry ${loadOf(player.cargo)}/${CAP} · cash RM${fmt(G.money.you)}`,'good');return hideShop()}
   else if(act==='leave')return hideShop();
   renderShop();updateHud();
 }
@@ -426,20 +434,21 @@ function playerDir(l){
 }
 function rivalPlan(l){
   const toTerminal=()=>{l.target=null;l.path=bfs(l.x,l.y,depot.door.x,depot.door.y)||[]};
-  if(l.load<4)return toTerminal();
+  const ld=loadOf(l.cargo);
+  if(ld<5)return toTerminal();
   const opts=[];
   for(const c of customers){const r=c.req;if(!r)continue;
     let ok=false,val=TYPES[c.type].profit;
     if(r.kind==='reorder')ok=c.owner===l.co;
     else ok=(c.owner!==l.co||r.unhappy)&&!(c.cool[l.co]>0);
-    if(!ok||r.qty>l.load)continue;
+    if(!ok||r.qty>l.cargo[r.product])continue;
     const p=bfs(l.x,l.y,c.door.x,c.door.y); if(!p)continue;
     if(p.length/l.speed>r.t+1)continue;
     opts.push({c,p,score:(p.length+3)/(val+40)*(r.kind==='reorder'?.7:1)*rnd(.8,1.2)});
   }
   opts.sort((a,b)=>a.score-b.score);
   if(opts.length){l.target=opts[0].c;l.path=opts[0].p;return}
-  if(l.load<CAP/2)return toTerminal();
+  if(ld<CAP/2)return toTerminal();
   // wander
   l.target=null; let tx,ty;do{tx=Math.floor(Math.random()*W);ty=Math.floor(Math.random()*H)}while(!isRoad(tx,ty));
   l.path=(bfs(l.x,l.y,tx,ty)||[]).slice(0,6);
@@ -543,11 +552,12 @@ function draw(){
   for(const c of customers){if(!c.req)continue;const r=c.req;
     const px=c.x*T+T/2,py=c.y*T-10;
     const col=r.kind==='reorder'?COMPANIES[c.owner].color:r.kind==='switch'||r.unhappy?'#f97316':'#ffffff';
-    const label=(r.kind==='reorder'?'📦 ':'💬 ')+r.qty+'×'+r.product;
+    const label=(r.kind==='reorder'?'📦 ':'💬 ')+r.qty+'×'+r.product+'   ';
     ctx.font='bold 11px system-ui';const w=ctx.measureText(label).width+14;
     const pulse=r.t<5?(Math.sin(performance.now()/90)>0?1:.5):1;
     ctx.globalAlpha=pulse;ctx.fillStyle=col;rr(px-w/2,py-9,w,18,8);ctx.fill();
     ctx.fillStyle=(r.kind==='reorder'||r.kind==='switch'||r.unhappy)?'#fff':'#111';ctx.fillText(label,px,py);
+    ctx.fillStyle=PCOL[r.product];rr(px+w/2-13,py-6,7,12,3);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke();
     // timer bar
     ctx.fillStyle='#0008';ctx.fillRect(px-w/2,py+10,w,3);ctx.fillStyle=r.t<5?'#f87171':'#4ade80';ctx.fillRect(px-w/2,py+10,w*r.t/r.max,3);
     ctx.globalAlpha=1;
@@ -571,14 +581,20 @@ function drawLorry(l){
   ctx.save();ctx.translate(cx,cy);ctx.rotate(Math.atan2(l.dir.dy,l.dir.dx));
   ctx.fillStyle='#0006';rr(-14,-8,30,18,4);ctx.fill();
   ctx.fillStyle='#e5e7eb';rr(-15,-9,20,18,3);ctx.fill();           // cargo bed
-  ctx.fillStyle=col;for(let i=0;i<3;i++)for(let j=0;j<2;j++){ctx.beginPath();ctx.arc(-11+i*6,-4+j*8,2.6,0,7);ctx.fill()} // cylinders
+  { // cylinders on the bed, coloured by product, showing how full the lorry is
+    const slots=[],ld=loadOf(l.cargo);let n=Math.round(ld/CAP*6);if(ld>0&&n===0)n=1;
+    for(const k of PRODS){const m=Math.round(l.cargo[k]/Math.max(1,ld)*n);for(let i=0;i<m&&slots.length<n;i++)slots.push(PCOL[k])}
+    while(slots.length<n)slots.push(PCOL[PRODS.find(k=>l.cargo[k]>0)||'C14']);
+    for(let i=0;i<6;i++){const sx=-11+(i%3)*6,sy=-4+Math.floor(i/3)*8;ctx.beginPath();ctx.arc(sx,sy,2.7,0,7);
+      if(slots[i]){ctx.fillStyle=slots[i];ctx.fill();ctx.strokeStyle='#0008';ctx.lineWidth=.8;ctx.stroke()}else{ctx.strokeStyle='#9ca3af';ctx.lineWidth=.8;ctx.stroke()}}
+  }
   ctx.fillStyle=col;rr(6,-9,10,18,3);ctx.fill();                    // cab
   ctx.fillStyle='#bfdbfe';ctx.fillRect(12,-7,3,14);                  // windscreen
   ctx.restore();
   ctx.font='bold 9px system-ui';ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=3;
   ctx.strokeText(COMPANIES[l.co].short,cx,cy-15);ctx.fillText(COMPANIES[l.co].short,cx,cy-15);
   if(l===player){ctx.strokeStyle='#4ade80';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,19,0,7);ctx.stroke()}
-  const ld=(l===player?loadOf(l.cargo):l.load)/CAP;
+  const ld=loadOf(l.cargo)/CAP;
   ctx.fillStyle='#000a';ctx.fillRect(cx-12,cy+12,24,4);ctx.fillStyle=ld<.2?'#f87171':'#4ade80';ctx.fillRect(cx-12,cy+12,24*ld,4);
 }
 
@@ -587,11 +603,13 @@ const $=id=>document.getElementById(id);
 function updateHud(){
   const t=Math.max(0,G.time);$('sTime').textContent=`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
   $('sTime').style.color=t<30?'var(--bad)':'';
-  $('sCash').textContent=fmt(G.cash);$('sMkt').textContent=fmt(G.mkt);
+  $('sCash').textContent=fmt(G.money.you);$('sMkt').textContent=fmt(G.mkt);
   $('board').innerHTML=Object.entries(COMPANIES).map(([k,c])=>{const n=customers.filter(x=>x.owner===k).length;
-    return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> ${n} customers · profit RM${fmt(G.money[k])}</div>`}).join('');
+    const l=lorries.find(l=>l.co===k);
+    return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> 💰RM${fmt(G.money[k])} · ${n} cust · 🚚${loadOf(l.cargo)}/${CAP}</div>`}).join('');
   const ld=loadOf(player.cargo);
-  $('cargo').innerHTML=`<span class="cg ${ld<6?'empty':''}">🚚 Load <b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${k} ${player.cargo[k]}</span>`).join('');
+  $('cargo').innerHTML=`<span class="ttl">MY LORRY</span><span class="cash">💰 RM ${fmt(G.money.you)}</span>
+    <span class="cg ${ld<6?'empty':''}">🚚 Stock <b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${cyl(k,player.cargo[k])}</span>`).join('');
 }
 function toast(msg,cls=''){const t=$('toast');t.innerHTML=msg;t.className=cls;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2300)}
 function modal(h){$('modal').innerHTML=h;$('modalWrap').classList.remove('hidden')}
@@ -599,14 +617,15 @@ function closeModal(){$('modalWrap').classList.add('hidden')}
 
 function endGame(){
   G.over=true;G.running=false;hideOffer();updateHud();
-  const rows=Object.entries(COMPANIES).map(([k,c])=>({k,...c,n:customers.filter(x=>x.owner===k).length,m:G.money[k]}))
-    .map(r=>({...r,score:Math.round(r.m+r.n*60)})).sort((a,b)=>b.score-a.score);
+  const rows=Object.entries(COMPANIES).map(([k,c])=>{const l=lorries.find(l=>l.co===k);
+      return {k,...c,n:customers.filter(x=>x.owner===k).length,m:G.money[k],stock:costOf(l.cargo)}})
+    .map(r=>({...r,score:Math.round(r.m+r.stock+r.n*100)})).sort((a,b)=>b.score-a.score);
   const rank=rows.findIndex(r=>r.k==='you')+1;
   SFX.update(false,false,0);SFX.fanfare(rank===1);
   modal(`<h2>${rank===1?'🏆 Green Gas wins the town!':rank===2?'🥈 So close!':'📉 The rivals out-drove you'}</h2>
-   <p>You finished <b>#${rank}</b>. Score = gross profit (sales minus terminal price) + RM60 per customer you hold at the end. You finished with RM${fmt(G.cash)} cash.</p>
-   <table><tr><th>Company</th><th>Customers</th><th>Profit</th><th>Score</th></tr>
-   ${rows.map(r=>`<tr><td style="color:${r.color}"><b>${r.name}</b></td><td>${r.n}</td><td>RM${fmt(r.m)}</td><td><b>${fmt(r.score)}</b></td></tr>`).join('')}</table>
+   <p>You finished <b>#${rank}</b>. Everyone started with RM${fmt(START_CASH)}. Score = cash + stock still on the lorry (at terminal price) + RM100 per customer you hold.</p>
+   <table><tr><th>Company</th><th>Customers</th><th>Cash</th><th>Stock</th><th>Score</th></tr>
+   ${rows.map(r=>`<tr><td style="color:${r.color}"><b>${r.name}</b></td><td>${r.n}</td><td>RM${fmt(r.m)}</td><td>RM${fmt(r.stock)}</td><td><b>${fmt(r.score)}</b></td></tr>`).join('')}</table>
    <p class="muted">Tips: plan your route, buy the right mix at the terminal so you have enough for big orders, use trade marketing on big customers so rivals can't steal them, and never miss a 📦 reorder.</p>
    <button class="primary" onclick="SFX.init();closeModal();newGame();G.running=true">Play again</button>`);
 }
@@ -617,10 +636,10 @@ function intro(){
    <li><b>💬 Customer bubble</b> = someone looking for an LPG supplier. Drive to the dot at their door <b>before the rivals do</b>.</li>
    <li>When you arrive, pick an offer <b>fast</b> (5 seconds, keys 1/2/3): <b>Standard price</b>, <b>Discount</b>, or <b>Trade marketing</b> (free safety check, promo banner and loyalty card; costs marketing budget, but ⭐ loyal customers can't be poached).</li>
    <li><b>📦 Reorder</b> = your customer needs more gas. Deliver before the timer runs out, or they'll start shopping around. Each delivery adds RM20 to your marketing budget.</li>
-   <li>Every order has a <b>quantity</b> (e.g. 4×C50). You need that many on board to sell.</li><li>Your lorry carries <b>30 units</b>. When stock runs low, park at the <b>⛽ LPG terminal</b> in the middle of town and <b>buy</b> more. Rival lorries must refill there too!</li>
+   <li>Every order has a <b>quantity</b> (e.g. 4×C50). You need that many on board to sell.</li><li>Your lorry carries <b>30 cylinders</b>. All 4 companies start with <b>RM10,000</b>. When stock runs low, park at the <b>⛽ LPG terminal</b> in the middle of town and <b>buy</b> more. Rival lorries must refill there too!</li>
   </ul>
   <table><tr><th>Customer</th><th>Products</th></tr>
-  ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip ${p==='C14'?'sub':'com'}">${p}</span>`).join('')}</td></tr>`).join('')}</table>
+  ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip">${cyl(p)}</span>`).join(' ')}</td></tr>`).join('')}</table>
   <p class="muted" style="font-size:12px">Drive with arrow keys / WASD, or tap the map to auto-drive.</p>
   <button class="primary" onclick="SFX.init();SFX.horn();closeModal();G.running=true">Start driving ▶</button>`);
 }
