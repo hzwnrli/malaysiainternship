@@ -46,13 +46,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
 .opts button b{display:block;font-size:13px;padding-right:34px}
 .opts button .pct{float:right;color:var(--good);font-weight:800}
 @media (max-width:560px){.opts{grid-template-columns:1fr}}
-#pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,52px);gap:6px;justify-content:center;margin-top:10px}
-#pad button{font-size:22px;background:var(--panel2);touch-action:none}
-#pad .up{grid-column:2}
-#pad .left{grid-column:1;grid-row:2}#pad .down{grid-column:2;grid-row:2}#pad .right{grid-column:3;grid-row:2}
-@media (hover:hover) and (pointer:fine){#pad{display:none}}
 button{touch-action:manipulation}
-body.panel #pad{display:none}
 /* ---------- phones ---------- */
 @media (max-width:700px){
   .wrap{padding:4px 6px 6px}
@@ -100,10 +94,8 @@ body.panel #pad{display:none}
   .brand{font-size:13px}
   .stat{font-size:11px;padding:2px 6px}
 }
-/* any touch screen: floating translucent arrow pad, bottom panel for offers */
+/* any touch screen: offer & terminal panel slides up from the bottom */
 @media (hover:none),(max-width:700px){
-  #pad{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));margin:0;z-index:10;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,44px);gap:4px;opacity:.75}
-  #pad button{background:#000b;border:2px solid #ffffff55;font-size:18px;padding:0}
   #offer{position:fixed;left:0;right:0;bottom:0;transform:none;width:auto;border-radius:16px 16px 0 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));max-height:75vh;overflow:auto;z-index:15}
   .shop button{padding:6px 14px;font-size:16px}
 }
@@ -143,12 +135,8 @@ body.panel #pad{display:none}
     <canvas id="c" width="800" height="544"></canvas>
     <div id="offer"></div>
   </div>
-  <div id="pad">
-    <button class="up" data-d="up">▲</button><button class="left" data-d="left">◀</button>
-    <button class="down" data-d="down">▼</button><button class="right" data-d="right">▶</button>
-  </div>
   <div class="help">
-    <b>Drive:</b> tap anywhere on the map to auto-drive there, or use the arrow pad / arrow keys / WASD. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 50 cylinders).<br>
+    <b>Drive:</b> tap a customer, the terminal or any road on the map and the lorry drives there by itself (arrow keys / WASD also work on a computer). <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 50 cylinders).<br>
     Bubbles: <span class="tag" style="background:#16a34a;color:#fff">YOUR ORDER</span> your customer needs gas – deliver before time runs out · <span class="tag" style="background:#fff;color:#000">NEW</span> new customer, no supplier yet · <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> customer is unhappy with their supplier – anyone can win them.<br>
     Cylinders: <span id="legendCyl"></span> Game numbers are not real prices.
   </div>
@@ -760,7 +748,7 @@ function intro(){
   </ul>
   <table><tr><th>Customer</th><th>Products</th></tr>
   ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip">${cyl(p)}</span>`).join(' ')}</td></tr>`).join('')}</table>
-  <p class="muted" style="font-size:12px">Drive with arrow keys / WASD, or tap the map to auto-drive.</p>
+  <p class="muted" style="font-size:12px"><b>Drive:</b> tap a customer, the terminal or a road on the map and your lorry drives there automatically. On a computer you can also use arrow keys / WASD.</p>
   <button class="primary" onclick="SFX.init();SFX.horn();closeModal();G.running=true">Start driving ▶</button>`);
 }
 
@@ -779,11 +767,6 @@ addEventListener('keydown',e=>{
 document.getElementById('mute').onclick=()=>{SFX.init();SFX.setMuted(!SFX.muted)};
 addEventListener('keyup',e=>{const d=KEYMAP[e.key];if(d)held.delete(d)});
 addEventListener('blur',()=>held.clear());
-document.querySelectorAll('#pad button').forEach(b=>{
-  const d=b.dataset.d;
-  b.addEventListener('pointerdown',e=>{e.preventDefault();held.add(d);lastKey=d;player.path=[]});
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>held.delete(d)));
-});
 document.getElementById('orders').addEventListener('pointerdown',e=>{const b=e.target.closest('[data-go]');if(!b||!G.running||offer||shop)return;
   const c=customers[+b.dataset.go],sx=player.moving?player.nx:player.x,sy=player.moving?player.ny:player.y;const p=bfs(sx,sy,c.door.x,c.door.y);if(p)player.path=p});
 offerEl.addEventListener('click',e=>{const s=e.target.closest('[data-shop]');if(s&&!s.disabled){shopAction(s.dataset.shop);return}const b=e.target.closest('[data-offer]');if(b&&!b.disabled)chooseOffer(b.dataset.offer)});

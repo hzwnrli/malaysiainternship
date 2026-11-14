@@ -16,7 +16,7 @@ A driving game. You are the **green** company's lorry, racing **blue**, **yellow
 - Final score = cash + stock left on the lorry (at terminal price) + RM100 per customer.
 - Sound: a cash-register ching on every sale, coin jackpot on new deals, engine noise, and background music that speeds up in the last 30 seconds. Press M or 🔊 to mute.
 - Controls: arrow keys / WASD, tap the map to auto-drive, keys 1–3 to choose offers.
-- Mobile friendly: phones held upright get a tall town map, phones held sideways get the info on the left and the map on the right. The whole map always fits the screen, with a floating arrow pad and offer panel at the bottom.
+- Mobile friendly: phones held upright get a tall town map, phones held sideways get the info on the left and the map on the right. The whole map always fits the screen, and the offer panel slides up from the bottom. Drive by tapping the map.
 
 ## ⛽ LPG Dealer Wars (`lpg-dealer-wars/index.html`)
 A turn-based strategy game: a 30-day campaign with truck capacity, upgrades, events and a subsidised-C14 compliance mechanic.
