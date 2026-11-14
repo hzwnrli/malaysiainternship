@@ -51,6 +51,68 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
 #pad .up{grid-column:2}
 #pad .left{grid-column:1;grid-row:2}#pad .down{grid-column:2;grid-row:2}#pad .right{grid-column:3;grid-row:2}
 @media (hover:hover) and (pointer:fine){#pad{display:none}}
+button{touch-action:manipulation}
+body.panel #pad{display:none}
+/* ---------- phones ---------- */
+@media (max-width:700px){
+  .wrap{padding:4px 6px 6px}
+  body{font-size:13px}
+  .lbl,#orders .expl,#orders .chances,.help{display:none}
+  .brand{font-size:14px}
+  #hud{gap:4px;margin-bottom:4px}
+  .stat{padding:2px 7px;font-size:12px}
+  #mute{padding:2px 8px !important}
+  #board{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin-bottom:4px;scrollbar-width:none}
+  #board::-webkit-scrollbar,#orders .list::-webkit-scrollbar{display:none}
+  .co{white-space:nowrap;font-size:10px;padding:1px 6px;border-left-width:4px}
+  #cargo{padding:4px 6px;gap:3px;font-size:11px;margin-bottom:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  #cargo .cash{font-size:14px;margin-right:0;white-space:nowrap}
+  #cargo .ttl{display:none}
+  .cg{padding:1px 4px;white-space:nowrap;flex:0 0 auto}
+  .cg .n{font-size:12px}
+  .pill{font-size:10px;padding:0 4px 0 2px;border-width:1.5px;gap:2px}
+  .pill .cyl{width:6px;height:10px}
+  #orders{padding:4px 6px;font-size:11px;margin-bottom:4px;display:flex;gap:6px;align-items:center}
+  #orders .hd{margin:0;flex:0 0 auto}
+  #orders .hd b{font-size:11px}
+  #orders .list{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1}
+  .ord{white-space:nowrap;flex:0 0 auto;padding:2px 6px;font-size:11px}
+  .ord .tm{font-size:12px;min-width:22px}
+  canvas{border-radius:8px}
+  .opts button{padding:10px 8px;font-size:12px}
+  .modal{padding:14px}
+}
+/* phone held sideways: info on the left, map on the right */
+@media (orientation:landscape) and (max-height:520px){
+  .wrap{display:grid;grid-template-columns:minmax(190px,30%) 1fr;column-gap:8px;align-content:start;max-width:none;padding:4px 8px}
+  .wrap>*{grid-column:1}
+  .stage{grid-column:2;grid-row:1/span 8}
+  .help,.lbl,#orders .expl,#orders .chances{display:none}
+  #board{flex-direction:column;gap:3px}
+  #board .co{font-size:10px;padding:1px 6px}
+  #cargo{font-size:11px;padding:4px 6px;gap:3px}
+  #cargo .cash{font-size:14px}
+  #cargo .ttl{display:none}
+  .cg{padding:1px 4px}
+  .pill{font-size:10px;padding:0 4px 0 2px}
+  #orders{font-size:11px;padding:4px 6px}
+  #orders .list{flex-direction:column}
+  .brand{font-size:13px}
+  .stat{font-size:11px;padding:2px 6px}
+}
+/* any touch screen: floating translucent arrow pad, bottom panel for offers */
+@media (hover:none),(max-width:700px){
+  #pad{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));margin:0;z-index:10;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,44px);gap:4px;opacity:.75}
+  #pad button{background:#000b;border:2px solid #ffffff55;font-size:18px;padding:0}
+  #offer{position:fixed;left:0;right:0;bottom:0;transform:none;width:auto;border-radius:16px 16px 0 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));max-height:75vh;overflow:auto;z-index:15}
+  .shop button{padding:6px 14px;font-size:16px}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #offer{left:auto;width:min(460px,60vw);border-radius:16px 0 0 0;max-height:96vh}
+  .opts{grid-template-columns:1fr}
+  .opts button{padding:6px 8px}
+}
+}
 .help{color:var(--muted);font-size:12px;margin-top:8px}
 .chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--panel2);margin:1px}
 .chip.sub{background:#1e3a8a;color:#dbeafe}.chip.com{background:#14532d;color:#dcfce7}
@@ -71,7 +133,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <div class="brand">🚚 LPG Lorry Rush</div>
     <div class="stat">⏱️ <b id="sTime">3:00</b></div>
     <span id="sCash" hidden></span>
-    <div class="stat">📣 Marketing budget RM <b id="sMkt">0</b></div>
+    <div class="stat">📣 <span class="lbl">Marketing budget </span>RM <b id="sMkt">0</b></div>
     <button id="mute" title="Sound on/off (M)" style="padding:4px 10px">🔊</button>
   </div>
   <div id="board"></div>
@@ -86,7 +148,7 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
     <button class="down" data-d="down">▼</button><button class="right" data-d="right">▶</button>
   </div>
   <div class="help">
-    <b>Drive:</b> arrow keys / WASD, or tap anywhere on the map to auto-drive there. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 50 cylinders).<br>
+    <b>Drive:</b> tap anywhere on the map to auto-drive there, or use the arrow pad / arrow keys / WASD. <b>Offer:</b> keys 1 · 2 · 3. <b>Sound:</b> M or 🔊. <b>Buy stock</b>: park at the ⛽ LPG terminal (lorry holds 50 cylinders).<br>
     Bubbles: <span class="tag" style="background:#16a34a;color:#fff">YOUR ORDER</span> your customer needs gas – deliver before time runs out · <span class="tag" style="background:#fff;color:#000">NEW</span> new customer, no supplier yet · <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> customer is unhappy with their supplier – anyone can win them.<br>
     Cylinders: <span id="legendCyl"></span> Game numbers are not real prices.
   </div>
@@ -96,7 +158,9 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
 
 <script>
 // ================= CONFIG =================
-const T=32, W=25, H=17, GAME_TIME=180;
+const T=32, GAME_TIME=180;
+let W=25, H=17;
+const isPortrait=()=>innerWidth<760&&innerHeight>innerWidth;
 const cv=document.getElementById('c'), ctx=cv.getContext('2d');
 const COMPANIES={
   you:{name:'YOU – Green Gas',short:'YOU',color:'#16a34a'},
@@ -250,8 +314,11 @@ function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Mat
 function newGame(){
   G={spent:0,time:GAME_TIME,mkt:300,running:false,over:false,elapsed:0,money:{you:START_CASH,blue:START_CASH,yellow:START_CASH,red:START_CASH},profit:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
-  depot={bx:3,by:2}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
-  for(let by=0;by<4;by++)for(let bx=0;bx<6;bx++){
+  if(isPortrait()){W=13;H=21}else{W=25;H=17}
+  cv.width=W*T;cv.height=H*T;
+  const BW=(W-1)/4,BH=(H-1)/4;
+  depot={bx:Math.floor(BW/2),by:Math.floor(BH/2)}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
+  for(let by=0;by<BH;by++)for(let bx=0;bx<BW;bx++){
     if(bx===depot.bx&&by===depot.by)continue;
     const sides=shuffle([{dx:1,dy:0,ox:1,oy:-1},{dx:1,dy:2,ox:1,oy:3},{dx:0,dy:1,ox:-1,oy:1},{dx:2,dy:1,ox:3,oy:1}]);
     let n=Math.random()<.6?2:1;
@@ -368,6 +435,7 @@ function openOffer(c){
   offer={c,t:5,max:5,lastTick:5}; renderOffer(); SFX.ping();
 }
 function renderOffer(){
+  document.body.classList.add('panel');
   if(!offer)return; const c=offer.c,r=c.req,ty=TYPES[c.type];
   const have=player.cargo[r.product], enough=have>=r.qty;
   offerEl.style.display='block';
@@ -390,7 +458,7 @@ function chooseOffer(id){
   } else {c.cool.you=5;toast(`❌ ${c.name} said no. Try again in a few seconds.`,'bad');SFX.fail()}
   hideOffer(); updateHud();
 }
-function hideOffer(){offer=null;offerEl.style.display='none';if(player)player.halt=false}
+function hideOffer(){document.body.classList.remove('panel');offer=null;offerEl.style.display='none';if(player)player.halt=false}
 
 // ================= TERMINAL (buy stock) =================
 const costOf=b=>PRODS.reduce((s,k)=>s+b[k]*PRICE[k].buy,0);
@@ -407,6 +475,7 @@ function suggestFor(cargo,cash){
 function openShop(){SFX.horn();player.halt=true;player.path=[];shop={buy:suggestBuy()};renderShop()}
 function shopCost(){return PRODS.reduce((s,k)=>s+shop.buy[k]*PRICE[k].buy,0)}
 function renderShop(){
+  document.body.classList.add('panel');
   if(!shop)return;
   const cur=loadOf(player.cargo),add=PRODS.reduce((s,k)=>s+shop.buy[k],0),cost=shopCost();
   offerEl.style.display='block';
@@ -435,7 +504,7 @@ function shopAction(a){
   else if(act==='leave')return hideShop();
   renderShop();updateHud();
 }
-function hideShop(){shop=null;shopDismissed=true;offerEl.style.display='none';player.halt=false;updateHud()}
+function hideShop(){document.body.classList.remove('panel');shop=null;shopDismissed=true;offerEl.style.display='none';player.halt=false;updateHud()}
 
 // ================= MOVEMENT =================
 function playerDir(l){
@@ -626,16 +695,25 @@ function drawLorry(l){
 
 // ================= HUD =================
 const $=id=>document.getElementById(id);
+function fit(){
+  const st=document.querySelector('.stage');if(!st)return;
+  const top=st.getBoundingClientRect().top+scrollY;
+  const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
+  const availH=Math.max(240,innerHeight-(side?8:top)-8);
+  cv.style.width=Math.min(st.clientWidth,availH*W/H)+'px';cv.style.margin='0 auto';
+}
+addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
 function updateHud(){
   if(!player)return;
+  requestAnimationFrame(fit);
   const my=customers.filter(c=>c.req&&c.req.kind==='reorder'&&c.owner==='you').sort((a,b)=>a.req.t-b.req.t);
   const nNew=customers.filter(c=>c.req&&c.req.kind==='new'&&!c.req.unhappy).length;
   const nGrab=customers.filter(c=>c.req&&(c.req.kind==='switch'||c.req.unhappy)).length;
-  $('orders').innerHTML=`<div class="hd"><b>📦 MY CUSTOMERS' ORDERS</b><span class="muted">deliver before time runs out, or they become <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> and rivals can take them</span>
-    <span style="margin-left:auto">Chances to win: <span class="tag" style="background:#fff;color:#000">NEW</span> ${nNew} · <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> ${nGrab}</span></div>
+  $('orders').innerHTML=`<div class="hd"><b>📦 MY CUSTOMERS' ORDERS</b><span class="muted expl">deliver before time runs out, or they become <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> and rivals can take them</span>
+    <span class="chances" style="margin-left:auto">Chances to win: <span class="tag" style="background:#fff;color:#000">NEW</span> ${nNew} · <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> ${nGrab}</span></div>
     <div class="list">${my.length?my.map(c=>{const r=c.req,ok=player.cargo[r.product]>=r.qty;
       return `<button class="ord ${r.t<6?'urgent':''}" data-go="${customers.indexOf(c)}"><span class="tm">${Math.ceil(r.t)}s</span>${TYPES[c.type].icon} ${c.name} <b>${r.qty}×</b>${cyl(r.product)} ${ok?'<span class="good">✔ in stock</span>':`<span class="bad">✖ only ${player.cargo[r.product]} – buy more</span>`}</button>`}).join('')
-      :'<span class="muted">No orders waiting. Go win more customers — look for NEW and GRAB IT! bubbles.</span>'}</div>`;
+      :'<span class="muted">No orders waiting<span class="lbl">. Go win more customers — look for NEW and GRAB IT! bubbles</span>.</span>'}</div>`;
   const t=Math.max(0,G.time);$('sTime').textContent=`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
   $('sTime').style.color=t<30?'var(--bad)':'';
   $('sCash').textContent=fmt(G.money.you);$('sMkt').textContent=fmt(G.mkt);
@@ -644,7 +722,7 @@ function updateHud(){
     return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> 💰RM${fmt(G.money[k])} · ${n} cust · 🚚${loadOf(l.cargo)}/${CAP}</div>`}).join('');
   const ld=loadOf(player.cargo);
   $('cargo').innerHTML=`<span class="ttl">MY LORRY</span><span class="cash">💰 RM ${fmt(G.money.you)}</span>
-    <span class="cg ${ld<6?'empty':''}">🚚 Stock <b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${cyl(k,player.cargo[k])}</span>`).join('');
+    <span class="cg ${ld<6?'empty':''}">🚚 <span class="lbl">Stock </span><b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${cyl(k,player.cargo[k])}</span>`).join('');
 }
 function toast(msg,cls=''){const t=$('toast');t.innerHTML=msg;t.className=cls;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2300)}
 function modal(h){$('modal').innerHTML=h;$('modalWrap').classList.remove('hidden')}
