@@ -93,9 +93,9 @@ button{touch-action:manipulation}
 }
 /* phone held sideways: info on the left, map on the right */
 @media (orientation:landscape) and (max-height:520px){
-  .wrap{display:grid;grid-template-columns:minmax(190px,30%) 1fr;column-gap:8px;align-content:start;max-width:none;padding:4px 8px}
-  .wrap>*{grid-column:1}
-  .stage{grid-column:2;grid-row:1/span 8}
+  .wrap{display:grid;grid-template-columns:auto minmax(200px,1fr);column-gap:10px;align-content:start;max-width:none;padding:5px 8px 70px}
+  .wrap>*{grid-column:2}
+  .stage{grid-column:1;grid-row:1/span 8}
   .help,.lbl,#orders .expl,#orders .chances{display:none}
   #board{flex-direction:column;gap:3px}
   #board .lb{font-size:11px;padding:1px 7px 1px 2px}
@@ -116,9 +116,12 @@ button{touch-action:manipulation}
   .shop button{padding:6px 14px;font-size:16px}
 }
 @media (orientation:landscape) and (max-height:520px){
-  #offer{left:auto;width:min(460px,60vw);border-radius:16px 0 0 0;max-height:96vh}
-  .opts{grid-template-columns:1fr}
-  .opts button{padding:6px 8px}
+  #offer{left:0;right:0;width:auto;border-radius:16px 16px 0 0;max-height:96vh;padding:8px 12px calc(62px + env(safe-area-inset-bottom))}
+  .opts{grid-template-columns:repeat(3,1fr)}
+  .opts button{padding:8px;min-height:64px}
+  .shop tbody{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}
+  .shop tr{display:flex;align-items:center;justify-content:space-between;gap:6px;border-bottom:1px solid var(--line)}
+  .shop td{border:0}
 }
 }
 .help{color:var(--muted);font-size:12px;margin-top:8px}
@@ -169,7 +172,14 @@ button{touch-action:manipulation}
 // ================= CONFIG =================
 const T=32, GAME_TIME=180;
 let W=25, H=17;
-const isPortrait=()=>innerWidth<760&&innerHeight>innerWidth;
+const mobileMap=()=>matchMedia('(hover:none)').matches||Math.min(innerWidth,innerHeight)<560;
+let TR=false; // true = town drawn transposed (rows<->columns) so it fits the current screen orientation
+const P=(x,y)=>[(TR?y:x)*T,(TR?x:y)*T];   // world tile coords -> canvas pixels
+const SWt=()=>TR?H:W, SHt=()=>TR?W:H;      // canvas size in tiles
+function applyView(){
+  const want=(W>H)!==(innerWidth>innerHeight);
+  if(want!==TR||cv.width!==SWt()*T){TR=want;cv.width=SWt()*T;cv.height=SHt()*T;bg=null}
+}
 const cv=document.getElementById('c'), ctx=cv.getContext('2d');
 const COMPANIES={
   you:{name:'YOU – Green Gas',short:'YOU',color:'#16a34a'},
@@ -312,7 +322,7 @@ function floatText(x,y,text,color='#facc15',coins=0){
   floaters.push({x,y,text,color,t:0,life:1.4});
   for(let i=0;i<coins;i++)floaters.push({x,y,coin:true,vx:rnd(-60,60),vy:rnd(-160,-80),t:0,life:.9});
 }
-const cpos=c=>[c.x*T+T/2,c.y*T];
+const cpos=c=>{const [x,y]=P(c.x,c.y);return [x+T/2,y]};
 
 // ================= STATE =================
 let G, customers, lorries, player, depot, reqTimer, offer, shop=null, shopDismissed=false, bg;
@@ -323,8 +333,8 @@ function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Mat
 function newGame(){
   G={spent:0,time:GAME_TIME,mkt:300,running:false,over:false,elapsed:0,money:{you:START_CASH,blue:START_CASH,yellow:START_CASH,red:START_CASH},profit:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
-  if(isPortrait()){W=13;H=17}else{W=25;H=17}
-  cv.width=W*T;cv.height=H*T;
+  if(mobileMap()){W=13;H=17}else{W=25;H=17}
+  TR=null;
   const BW=(W-1)/4,BH=(H-1)/4;
   depot={bx:Math.floor(BW/2),by:Math.floor(BH/2)}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
   for(let by=0;by<BH;by++)for(let bx=0;bx<BW;bx++){
@@ -508,7 +518,7 @@ function shopAction(a){
   else if(act==='clear')PRODS.forEach(k=>shop.buy[k]=0);
   else if(act==='buy'){const cost=shopCost();if(cost>G.money.you)return;
     PRODS.forEach(k=>player.cargo[k]+=shop.buy[k]);G.money.you-=cost;G.spent+=cost;
-    SFX.register();floatText(player.x*T+T/2,player.y*T,`−RM${fmt(cost)}`,'#f87171');
+    SFX.register();floatText(P(player.x,player.y)[0]+T/2,P(player.x,player.y)[1],`−RM${fmt(cost)}`,'#f87171');
     toast(`⛽ Bought stock for RM${fmt(cost)} · lorry ${loadOf(player.cargo)}/${CAP} · cash RM${fmt(G.money.you)}`,'good');return hideShop()}
   else if(act==='leave')return hideShop();
   renderShop();updateHud();
@@ -600,27 +610,29 @@ let hudTick=0;
 
 // ================= DRAW =================
 function buildBg(){
-  bg=document.createElement('canvas');bg.width=W*T;bg.height=H*T;const b=bg.getContext('2d');
+  applyView();
+  bg=document.createElement('canvas');bg.width=cv.width;bg.height=cv.height;const b=bg.getContext('2d');
   b.fillStyle='#3d7a4a';b.fillRect(0,0,bg.width,bg.height);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    if(isRoad(x,y)){b.fillStyle='#3b3f45';b.fillRect(x*T,y*T,T,T);
+    const [px,py]=P(x,y);
+    if(isRoad(x,y)){b.fillStyle='#3b3f45';b.fillRect(px,py,T,T);
       b.strokeStyle='#d6d3c4';b.lineWidth=2;b.setLineDash([5,5]);b.beginPath();
       const h=isRoad(x-1,y)||isRoad(x+1,y),v=isRoad(x,y-1)||isRoad(x,y+1);
-      if(x%4!==0&&h){b.moveTo(x*T,y*T+T/2);b.lineTo(x*T+T,y*T+T/2)}
-      if(y%4!==0&&v){b.moveTo(x*T+T/2,y*T);b.lineTo(x*T+T/2,y*T+T)}
+      if(x%4!==0&&h){b.moveTo(...P(x,y+.5));b.lineTo(...P(x+1,y+.5))}
+      if(y%4!==0&&v){b.moveTo(...P(x+.5,y));b.lineTo(...P(x+.5,y+1))}
       b.stroke();b.setLineDash([]);
     } else {
       const bx=Math.floor(x/4),by=Math.floor(y/4);
-      if(bx===depot.bx&&by===depot.by){b.fillStyle='#334155';b.fillRect(x*T,y*T,T,T);continue}
-      b.fillStyle=(x+y)%2?'#4a8a57':'#468453';b.fillRect(x*T,y*T,T,T);
+      if(bx===depot.bx&&by===depot.by){b.fillStyle='#334155';b.fillRect(px,py,T,T);continue}
+      b.fillStyle=(x+y)%2?'#4a8a57':'#468453';b.fillRect(px,py,T,T);
       if(!customers.some(c=>c.x===x&&c.y===y)){ // scenery
         const s=(x*7+y*13)%5; b.font='18px serif';b.textAlign='center';b.textBaseline='middle';
-        b.fillText(s<2?'🌳':s<3?'🏢':s<4?'🌴':'🏘️',x*T+T/2,y*T+T/2);
+        b.fillText(s<2?'🌳':s<3?'🏢':s<4?'🌴':'🏘️',px+T/2,py+T/2);
       }
     }
   }
   // depot
-  const dx=(4*depot.bx+1)*T,dy=(4*depot.by+1)*T;
+  const [dx,dy]=P(4*depot.bx+1,4*depot.by+1);
   b.fillStyle='#475569';b.fillRect(dx+4,dy+4,3*T-8,3*T-8);
   b.fillStyle='#fff';b.font='bold 13px system-ui';b.textAlign='center';b.textBaseline='middle';
   b.fillText('LPG',dx+1.5*T,dy+T*0.75);b.fillText('TERMINAL',dx+1.5*T,dy+T*2.3);
@@ -633,7 +645,7 @@ function draw(){
   ctx.textAlign='center';ctx.textBaseline='middle';
   // customers
   for(const c of customers){
-    const px=c.x*T,py=c.y*T,col=c.owner?COMPANIES[c.owner].color:'#e5e7eb';
+    const [px,py]=P(c.x,c.y),col=c.owner?COMPANIES[c.owner].color:'#e5e7eb';
     ctx.fillStyle=c.owner?col+'55':'#ffffff33';rr(px+2,py+2,T-4,T-4,6);ctx.fill();
     ctx.lineWidth=3;ctx.strokeStyle=col;ctx.stroke();
     ctx.fillStyle='#000';ctx.font='20px serif';ctx.fillText(TYPES[c.type].icon,px+T/2,py+T/2+1);
@@ -645,14 +657,14 @@ function draw(){
   for(const c of customers){if(!c.req)continue;const r=c.req;
     const mine=r.kind==='reorder'&&c.owner==='you';
     if(r.kind==='reorder'&&!mine){ // rival's own order: just a small dot in their colour
-      ctx.fillStyle=COMPANIES[c.owner].color;ctx.beginPath();ctx.arc(c.door.x*T+T/2,c.door.y*T+T/2,3,0,7);ctx.fill();continue}
+      ctx.fillStyle=COMPANIES[c.owner].color;ctx.beginPath();ctx.arc(...P(c.door.x+.5,c.door.y+.5),3,0,7);ctx.fill();continue}
     const grab=r.kind==='switch'||r.unhappy;
     const bgc=mine?'#16a34a':grab?'#f97316':'#ffffff', fg=mine||grab?'#fff':'#000';
     const tag=mine?'YOUR ORDER':grab?'GRAB IT!':'NEW';
     const qty=r.qty+'×';
     ctx.font='900 11px system-ui';const qw=ctx.measureText(qty).width;
     const pw=ctx.measureText(r.product).width+10,w=Math.max(qw+pw+12,ctx.measureText(tag).width+12),h=30;
-    const px=c.x*T+T/2,py=c.y*T-12;
+    const [px,py]=(([a,b])=>[a+T/2,b-12])(P(c.x,c.y));
     const pulse=r.t<5?(Math.sin(performance.now()/90)>0?1:.55):1;
     ctx.globalAlpha=pulse;
     c._bb={x:px-w/2,y:py-h/2,w,h:h+6};
@@ -669,14 +681,14 @@ function draw(){
     ctx.fillStyle='#000a';ctx.fillRect(px-w/2,py+h/2+1,w,4);ctx.fillStyle=r.t<5?'#f87171':'#4ade80';ctx.fillRect(px-w/2,py+h/2+1,w*r.t/r.max,4);
     ctx.globalAlpha=1;
     // door marker
-    ctx.fillStyle=bgc;ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.door.x*T+T/2,c.door.y*T+T/2,mine?6:5,0,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle=bgc;ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(...P(c.door.x+.5,c.door.y+.5),mine?6:5,0,7);ctx.fill();ctx.stroke();
   }
   // tap marker
   if(tapMark&&tapMark.t<.6){tapMark.t+=1/60;const a=1-tapMark.t/.6;ctx.globalAlpha=a;ctx.strokeStyle='#4ade80';ctx.lineWidth=3;
-    ctx.beginPath();ctx.arc(tapMark.x*T+T/2,tapMark.y*T+T/2,8+tapMark.t*30,0,7);ctx.stroke();ctx.globalAlpha=1}
+    ctx.beginPath();ctx.arc(...P(tapMark.x+.5,tapMark.y+.5),8+tapMark.t*30,0,7);ctx.stroke();ctx.globalAlpha=1}
   // autopilot path
-  if(player.path.length){ctx.strokeStyle='#4ade80aa';ctx.lineWidth=3;ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(player.x*T+T/2,player.y*T+T/2);
-    for(const [x,y] of player.path)ctx.lineTo(x*T+T/2,y*T+T/2);ctx.stroke();ctx.setLineDash([])}
+  if(player.path.length){ctx.strokeStyle='#4ade80aa';ctx.lineWidth=3;ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(...P(player.x+.5,player.y+.5));
+    for(const [x,y] of player.path)ctx.lineTo(...P(x+.5,y+.5));ctx.stroke();ctx.setLineDash([])}
   // lorries
   for(const l of lorries)drawLorry(l);
   // floating money
@@ -687,8 +699,8 @@ function draw(){
   ctx.globalAlpha=1;
 }
 function drawLorry(l){
-  const cx=l.x*T+T/2,cy=l.y*T+T/2,col=COMPANIES[l.co].color;
-  ctx.save();ctx.translate(cx,cy);ctx.rotate(Math.atan2(l.dir.dy,l.dir.dx));
+  const [cx,cy]=P(l.x+.5,l.y+.5),col=COMPANIES[l.co].color;
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(TR?Math.atan2(l.dir.dx,l.dir.dy):Math.atan2(l.dir.dy,l.dir.dx));
   ctx.fillStyle='#0006';rr(-14,-8,30,18,4);ctx.fill();
   ctx.fillStyle='#e5e7eb';rr(-15,-9,20,18,3);ctx.fill();           // cargo bed
   { // cylinders on the bed, coloured by product, showing how full the lorry is
@@ -710,14 +722,16 @@ function drawLorry(l){
 // ================= HUD =================
 const $=id=>document.getElementById(id);
 function fit(){
+  if(W&&customers)applyView();if(!bg&&customers)buildBg();
   const st=document.querySelector('.stage');if(!st)return;
-  const top=st.getBoundingClientRect().top+scrollY;
   const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
   const touch=matchMedia('(hover:none),(max-width:700px)').matches;
-  const availH=Math.max(240,innerHeight-(side?8:top)-(touch?76:8));
-  cv.style.width=Math.min(st.clientWidth,availH*W/H)+'px';cv.style.margin='0 auto';
+  let availW,availH;
+  if(side){availH=innerHeight-10;availW=innerWidth-Math.max(200,innerWidth*.3)-28}
+  else{const top=st.getBoundingClientRect().top+scrollY;availH=Math.max(240,innerHeight-top-(touch?76:8));availW=st.clientWidth}
+  cv.style.width=Math.max(160,Math.min(availW,availH*SWt()/SHt()))+'px';cv.style.margin=side?'0':'0 auto';
 }
-addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
+addEventListener('resize',fit);addEventListener('orientationchange',()=>{setTimeout(fit,100);setTimeout(fit,400)});
 function liveScores(){
   return Object.entries(COMPANIES).map(([k,c])=>{const l=lorries.find(l=>l.co===k),n=customers.filter(x=>x.owner===k).length,stock=costOf(l.cargo);
     return {k,...c,n,m:G.money[k],stock,score:Math.round(G.money[k]+stock+n*100)}}).sort((a,b)=>b.score-a.score);
@@ -824,11 +838,12 @@ let tapMark=null;
 cv.addEventListener('pointerdown',e=>{
   if(!G.running||offer||shop)return;
   const r=cv.getBoundingClientRect();
-  const mx=(e.clientX-r.left)/r.width*W*T, my=(e.clientY-r.top)/r.height*H*T; // canvas pixels
-  const pad=10*(W*T)/r.width; // ~10 screen px of extra touch area
+  const sx0=(e.clientX-r.left)/r.width*cv.width, sy0=(e.clientY-r.top)/r.height*cv.height; // canvas pixels
+  const mx=TR?sy0:sx0, my=TR?sx0:sy0; // world pixels
+  const pad=10*cv.width/r.width; // ~10 screen px of extra touch area
   let tx=null,ty=null;
   // a) order bubble (YOUR ORDER / NEW / GRAB IT!), most urgent first if bubbles overlap
-  const hits=customers.filter(c=>c._bb&&mx>=c._bb.x-pad&&mx<=c._bb.x+c._bb.w+pad&&my>=c._bb.y-pad&&my<=c._bb.y+c._bb.h+pad);
+  const hits=customers.filter(c=>c._bb&&sx0>=c._bb.x-pad&&sx0<=c._bb.x+c._bb.w+pad&&sy0>=c._bb.y-pad&&sy0<=c._bb.y+c._bb.h+pad);
   if(hits.length){const c=hits.sort((a,b)=>(a.req?a.req.t:99)-(b.req?b.req.t:99))[0];tx=c.door.x;ty=c.door.y}
   // b) a customer building or its door (nearest within ~1 tile)
   if(tx==null){
