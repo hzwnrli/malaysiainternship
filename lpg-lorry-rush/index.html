@@ -49,30 +49,30 @@ canvas{display:block;width:100%;height:auto;border-radius:12px;background:#2f5d3
 button{touch-action:manipulation}
 /* ---------- phones ---------- */
 @media (max-width:700px){
-  .wrap{padding:4px 6px 6px}
+  .wrap{padding:3px 4px 4px}
   body{font-size:13px}
   .lbl,#orders .expl,#orders .chances,.help{display:none}
   .brand{font-size:14px}
-  #hud{gap:4px;margin-bottom:4px}
+  #hud{gap:4px;margin-bottom:3px}
   .stat{padding:2px 7px;font-size:12px}
   #mute{padding:2px 8px !important}
-  #board{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin-bottom:4px;scrollbar-width:none}
+  #board{flex-wrap:nowrap;overflow-x:auto;gap:3px;margin-bottom:3px;scrollbar-width:none}
   #board::-webkit-scrollbar,#orders .list::-webkit-scrollbar{display:none}
   .co{white-space:nowrap;font-size:10px;padding:1px 6px;border-left-width:4px}
-  #cargo{padding:4px 6px;gap:3px;font-size:11px;margin-bottom:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  #cargo{padding:3px 6px;gap:3px;font-size:11px;margin-bottom:3px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-width:1.5px}
   #cargo .cash{font-size:14px;margin-right:0;white-space:nowrap}
   #cargo .ttl{display:none}
   .cg{padding:1px 4px;white-space:nowrap;flex:0 0 auto}
   .cg .n{font-size:12px}
   .pill{font-size:10px;padding:0 4px 0 2px;border-width:1.5px;gap:2px}
   .pill .cyl{width:6px;height:10px}
-  #orders{padding:4px 6px;font-size:11px;margin-bottom:4px;display:flex;gap:6px;align-items:center}
+  #orders{padding:3px 6px;font-size:11px;margin-bottom:3px;display:flex;gap:6px;align-items:center;border-width:1.5px}
   #orders .hd{margin:0;flex:0 0 auto}
   #orders .hd b{font-size:11px}
   #orders .list{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1}
   .ord{white-space:nowrap;flex:0 0 auto;padding:2px 6px;font-size:11px}
   .ord .tm{font-size:12px;min-width:22px}
-  canvas{border-radius:8px}
+  canvas{border-radius:6px}
   .opts button{padding:10px 8px;font-size:12px}
   .modal{padding:14px}
 }
@@ -303,14 +303,14 @@ function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Mat
 function newGame(){
   G={spent:0,time:GAME_TIME,mkt:300,running:false,over:false,elapsed:0,money:{you:START_CASH,blue:START_CASH,yellow:START_CASH,red:START_CASH},profit:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
-  if(isPortrait()){W=13;H=21}else{W=25;H=17}
+  if(isPortrait()){W=13;H=17}else{W=25;H=17}
   cv.width=W*T;cv.height=H*T;
   const BW=(W-1)/4,BH=(H-1)/4;
   depot={bx:Math.floor(BW/2),by:Math.floor(BH/2)}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
   for(let by=0;by<BH;by++)for(let bx=0;bx<BW;bx++){
     if(bx===depot.bx&&by===depot.by)continue;
     const sides=shuffle([{dx:1,dy:0,ox:1,oy:-1},{dx:1,dy:2,ox:1,oy:3},{dx:0,dy:1,ox:-1,oy:1},{dx:2,dy:1,ox:3,oy:1}]);
-    let n=Math.random()<.6?2:1;
+    let n=W===13?2:(Math.random()<.6?2:1);
     for(const s of sides){ if(!n)break;
       const x=4*bx+1+s.dx,y=4*by+1+s.dy,door={x:4*bx+1+s.ox,y:4*by+1+s.oy};
       if(usedDoor.has(key(door.x,door.y)))continue; usedDoor.add(key(door.x,door.y));
@@ -694,7 +694,7 @@ function fit(){
   const top=st.getBoundingClientRect().top+scrollY;
   const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
   const touch=matchMedia('(hover:none),(max-width:700px)').matches;
-  const availH=Math.max(240,innerHeight-(side?8:top)-(touch?84:8));
+  const availH=Math.max(240,innerHeight-(side?8:top)-(touch?76:8));
   cv.style.width=Math.min(st.clientWidth,availH*W/H)+'px';cv.style.margin='0 auto';
 }
 addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
@@ -704,7 +704,7 @@ function updateHud(){
   const my=customers.filter(c=>c.req&&c.req.kind==='reorder'&&c.owner==='you').sort((a,b)=>a.req.t-b.req.t);
   const nNew=customers.filter(c=>c.req&&c.req.kind==='new'&&!c.req.unhappy).length;
   const nGrab=customers.filter(c=>c.req&&(c.req.kind==='switch'||c.req.unhappy)).length;
-  $('orders').innerHTML=`<div class="hd"><b>📦 MY CUSTOMERS' ORDERS</b><span class="muted expl">deliver before time runs out, or they become <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> and rivals can take them</span>
+  $('orders').innerHTML=`<div class="hd"><b>📦<span class="lbl"> MY CUSTOMERS' ORDERS</span></b><span class="muted expl">deliver before time runs out, or they become <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> and rivals can take them</span>
     <span class="chances" style="margin-left:auto">Chances to win: <span class="tag" style="background:#fff;color:#000">NEW</span> ${nNew} · <span class="tag" style="background:#f97316;color:#fff">GRAB IT!</span> ${nGrab}</span></div>
     <div class="list">${my.length?my.map(c=>{const r=c.req,ok=player.cargo[r.product]>=r.qty;
       return `<button class="ord ${r.t<6?'urgent':''}" data-go="${customers.indexOf(c)}"><span class="tm">${Math.ceil(r.t)}s</span>${TYPES[c.type].icon} ${c.name} <b>${r.qty}×</b>${cyl(r.product)} ${ok?'<span class="good">✔ in stock</span>':`<span class="bad">✖ only ${player.cargo[r.product]} – buy more</span>`}</button>`}).join('')
