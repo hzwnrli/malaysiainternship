@@ -91,24 +91,32 @@ button{touch-action:manipulation}
   .opts button{padding:10px 8px;font-size:12px}
   .modal{padding:14px}
 }
-/* phone held sideways: info on the left, map on the right */
+/* phone held sideways: info in two short rows on top, map centred below */
 @media (orientation:landscape) and (max-height:520px){
-  .wrap{display:grid;grid-template-columns:auto minmax(200px,1fr);column-gap:10px;align-content:start;max-width:none;padding:5px 8px 70px}
-  .wrap>*{grid-column:2}
-  .stage{grid-column:1;grid-row:1/span 8}
-  .help,.lbl,#orders .expl,#orders .chances{display:none}
-  #board{flex-direction:column;gap:3px}
-  #board .lb{font-size:11px;padding:1px 7px 1px 2px}
-  .lbTitle{display:block}
-  #cargo{font-size:11px;padding:4px 6px;gap:3px}
-  #cargo .cash{font-size:14px}
+  .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 8px;align-content:start;max-width:none;padding:3px 8px 4px}
+  #hud{grid-column:1;grid-row:1;margin:0;flex-wrap:nowrap}
+  #board{grid-column:2;grid-row:1;margin:0;flex-wrap:nowrap;overflow-x:auto;gap:3px;justify-content:flex-end;scrollbar-width:none}
+  #cargo{grid-column:1;grid-row:2;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;font-size:11px;padding:3px 6px;gap:3px;border-width:1.5px}
+  #orders{grid-column:2;grid-row:2;margin:0;display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 6px;border-width:1.5px}
+  #orders .hd{margin:0;flex:0 0 auto}
+  #orders .list{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;flex:1}
+  .ord{white-space:nowrap;flex:0 0 auto;padding:2px 6px;font-size:11px}
+  .stage{grid-column:1/-1;grid-row:3}
+  .help,.lbl,.lbTitle,#orders .expl,#orders .chances{display:none}
+  .lb{font-size:11px;padding:1px 6px 1px 2px;gap:3px;border-width:1.5px}
+  .lb:not(.me) .nm{display:none}
+  .lb .rk{min-width:16px;height:16px;font-size:9px}
+  .gap{font-size:10px}
+  #cargo .cash{font-size:14px;white-space:nowrap}
   #cargo .ttl{display:none}
-  .cg{padding:1px 4px}
-  .pill{font-size:10px;padding:0 4px 0 2px}
-  #orders{font-size:11px;padding:4px 6px}
-  #orders .list{flex-direction:column}
+  .cg{padding:1px 4px;white-space:nowrap;flex:0 0 auto}
+  .cg .n{font-size:12px}
+  .pill{font-size:10px;padding:0 4px 0 2px;gap:2px}
+  .pill .cyl{width:6px;height:10px}
   .brand{font-size:13px}
   .stat{font-size:11px;padding:2px 6px}
+  #mute,#restart{padding:2px 8px !important;font-size:12px}
+  canvas{border-radius:6px}
 }
 /* any touch screen: offer & terminal panel slides up from the bottom */
 @media (hover:none),(max-width:700px){
@@ -727,9 +735,11 @@ function fit(){
   const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
   const touch=matchMedia('(hover:none),(max-width:700px)').matches;
   let availW,availH;
-  if(side){availH=innerHeight-10;availW=innerWidth-Math.max(200,innerWidth*.3)-28}
-  else{const top=st.getBoundingClientRect().top+scrollY;availH=Math.max(240,innerHeight-top-(touch?76:8));availW=st.clientWidth}
-  cv.style.width=Math.max(160,Math.min(availW,availH*SWt()/SHt()))+'px';cv.style.margin=side?'0':'0 auto';
+  const top=st.getBoundingClientRect().top+scrollY;
+  // sideways the map sits in the middle, so the Netlify badge (bottom-right) doesn't cover it
+  availH=Math.max(side?180:240,innerHeight-top-(side?6:touch?76:8));availW=st.clientWidth;
+  if(side)availW=Math.min(availW,innerWidth-2*230); // keep the bottom-right corner free for the badge
+  cv.style.width=Math.max(160,Math.min(availW,availH*SWt()/SHt()))+'px';cv.style.margin='0 auto';
 }
 addEventListener('resize',fit);addEventListener('orientationchange',()=>{setTimeout(fit,100);setTimeout(fit,400)});
 function liveScores(){
