@@ -115,8 +115,9 @@ button{touch-action:manipulation}
 .modal table{width:100%;border-collapse:collapse;font-size:13px}
 .modal td,.modal th{padding:5px;border-bottom:1px solid var(--line);text-align:left}
 .primary{background:var(--green);color:#fff;font-weight:800;padding:10px 18px}
-#toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#000e;padding:8px 16px;border-radius:10px;z-index:30;display:none;text-align:center;max-width:92vw}
+#toast{pointer-events:none;position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#000e;padding:8px 16px;border-radius:10px;z-index:30;display:none;text-align:center;max-width:92vw}
 .good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.muted{color:var(--muted)}
+@media (max-width:700px){#toast{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));height:auto;font-size:13px;padding:6px 12px}}
 </style>
 </head>
 <body>
@@ -771,10 +772,20 @@ addEventListener('keydown',e=>{
   if(offer){offer.c.cool.you=3;hideOffer()}
   if(shop)hideShop();
 });
-document.getElementById('restart').onclick=()=>{
-  if(G.running&&!G.over&&!confirm('Restart the game? Your current score will be lost.'))return;
-  SFX.init();closeModal();hideOffer();if(shop)hideShop();held.clear();newGame();G.running=true;SFX.horn();toast('🔄 New game started!');
-};
+function doRestart(){
+  SFX.init();closeModal();hideOffer();if(shop)hideShop();held.clear();player.path=[];newGame();G.running=true;SFX.horn();toast('🔄 New game started!');
+}
+document.getElementById('restart').addEventListener('click',e=>{
+  e.preventDefault();e.stopPropagation();
+  if(!G.running||G.over){doRestart();return}
+  // in-game Yes/Cancel box (browser confirm() is blocked in some phone browsers / in-app browsers)
+  G.running=false; // pause while asking
+  modal(`<h2>↻ Restart the game?</h2><p>Your current score will be lost and a new 3-minute round starts.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="primary" id="rsYes" style="flex:1;min-width:140px;padding:14px">Yes, restart</button>
+    <button id="rsNo" style="flex:1;min-width:140px;padding:14px">Cancel</button></div>`);
+  document.getElementById('rsYes').onclick=doRestart;
+  document.getElementById('rsNo').onclick=()=>{closeModal();G.running=true;last=performance.now()};
+});
 document.getElementById('mute').onclick=()=>{SFX.init();SFX.setMuted(!SFX.muted)};
 addEventListener('keyup',e=>{const d=KEYMAP[e.key];if(d)held.delete(d)});
 addEventListener('blur',()=>held.clear());
