@@ -17,7 +17,13 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .stat{background:var(--panel);border:1px solid var(--line);padding:4px 10px;border-radius:8px;white-space:nowrap}
 .stat b{color:#fff}
 #board{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-.co{display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:8px;padding:3px 10px;font-size:12px;border-left:5px solid}
+.lbTitle{font-weight:900;font-size:12px;color:var(--muted);letter-spacing:.5px;align-self:center}
+.lb{display:flex;align-items:center;gap:6px;background:var(--panel);border:2px solid var(--c);border-radius:999px;padding:2px 10px 2px 3px;font-size:13px;white-space:nowrap}
+.lb b{color:var(--c)}
+.lb .rk{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:50%;background:var(--c);color:#000;font-weight:900;font-size:11px}
+.lb .sc{font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.lb.me{background:#14532d;box-shadow:0 0 0 2px #4ade8055}
+.gap{align-self:center;font-weight:800;font-size:12px;white-space:nowrap}
 #cargo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:13px;background:var(--panel);border:2px solid var(--green);border-radius:12px;padding:8px 10px}
 #cargo .ttl{font-weight:800;color:var(--good);margin-right:4px}
 #cargo .cash{font-size:16px;font-weight:800;color:#facc15;margin-right:8px}
@@ -58,7 +64,16 @@ button{touch-action:manipulation}
   #mute{padding:2px 8px !important}
   #board{flex-wrap:nowrap;overflow-x:auto;gap:3px;margin-bottom:3px;scrollbar-width:none}
   #board::-webkit-scrollbar,#orders .list::-webkit-scrollbar{display:none}
-  .co{white-space:nowrap;font-size:10px;padding:1px 6px;border-left-width:4px}
+  .lbTitle{display:none}
+  #board{justify-content:space-between}
+  .lb:not(.me) .nm{display:none}
+  .lb{background:color-mix(in srgb,var(--c) 22%,#0f1a14)}
+  .lb.me{background:#14532d}
+  .lb{font-size:11px;padding:1px 6px 1px 2px;gap:3px;border-width:1.5px}
+  #board{gap:2px}
+  .gap{font-size:10px;letter-spacing:-.2px}
+  .lb .rk{min-width:16px;height:16px;font-size:9px}
+  .gap{font-size:10px}
   #cargo{padding:3px 6px;gap:3px;font-size:11px;margin-bottom:3px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-width:1.5px}
   #cargo .cash{font-size:14px;margin-right:0;white-space:nowrap}
   #cargo .ttl{display:none}
@@ -83,7 +98,8 @@ button{touch-action:manipulation}
   .stage{grid-column:2;grid-row:1/span 8}
   .help,.lbl,#orders .expl,#orders .chances{display:none}
   #board{flex-direction:column;gap:3px}
-  #board .co{font-size:10px;padding:1px 6px}
+  #board .lb{font-size:11px;padding:1px 7px 1px 2px}
+  .lbTitle{display:block}
   #cargo{font-size:11px;padding:4px 6px;gap:3px}
   #cargo .cash{font-size:14px}
   #cargo .ttl{display:none}
@@ -118,6 +134,7 @@ button{touch-action:manipulation}
 #toast{pointer-events:none;position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#000e;padding:8px 16px;border-radius:10px;z-index:30;display:none;text-align:center;max-width:92vw}
 .good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.muted{color:var(--muted)}
 @media (max-width:700px){#toast{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));height:auto;font-size:13px;padding:6px 12px}}
+@media (max-width:360px){.gap{display:none}}
 </style>
 </head>
 <body>
@@ -699,6 +716,10 @@ function fit(){
   cv.style.width=Math.min(st.clientWidth,availH*W/H)+'px';cv.style.margin='0 auto';
 }
 addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
+function liveScores(){
+  return Object.entries(COMPANIES).map(([k,c])=>{const l=lorries.find(l=>l.co===k),n=customers.filter(x=>x.owner===k).length,stock=costOf(l.cargo);
+    return {k,...c,n,m:G.money[k],stock,score:Math.round(G.money[k]+stock+n*100)}}).sort((a,b)=>b.score-a.score);
+}
 function updateHud(){
   if(!player)return;
   requestAnimationFrame(fit);
@@ -713,9 +734,16 @@ function updateHud(){
   const t=Math.max(0,G.time);$('sTime').textContent=`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
   $('sTime').style.color=t<30?'var(--bad)':'';
   $('sCash').textContent=fmt(G.money.you);$('sMkt').textContent=fmt(G.mkt);
-  $('board').innerHTML=Object.entries(COMPANIES).map(([k,c])=>{const n=customers.filter(x=>x.owner===k).length;
-    const l=lorries.find(l=>l.co===k);
-    return `<div class="co" style="border-color:${c.color}"><b style="color:${c.color}">${c.short}</b> 💰RM${fmt(G.money[k])} · ${n} cust · 🚚${loadOf(l.cargo)}/${CAP}</div>`}).join('');
+  // live leaderboard: our score vs the 3 rivals
+  const rows=liveScores(), me=rows.findIndex(r=>r.k==='you'), mine=rows[me].score;
+  const gap=me===0?`<span class="gap good">▲ ${fmt(mine-rows[1].score)} ahead</span>`:`<span class="gap warn">▼ ${fmt(rows[0].score-mine)} behind #1</span>`;
+  $('board').innerHTML=`<span class="lbTitle">🏁 LIVE SCORE</span>`+rows.map((r,i)=>
+    `<div class="lb ${r.k==='you'?'me':''}" style="--c:${r.color}"><span class="rk">${i===0?'👑':i+1}</span><b class="nm">${r.short}</b><span class="sc">${fmt(r.score)}</span></div>`).join('')+gap;
+  if(G.running&&G.lastRank&&me+1!==G.lastRank){
+    if(me+1<G.lastRank){toast(me===0?'👑 You are now #1!':`⬆ You moved up to #${me+1}!`,'good');SFX.ping()}
+    else toast(`⬇ ${rows[me-1].short} overtook you – you're #${me+1}`,'bad');
+  }
+  G.lastRank=me+1;
   const ld=loadOf(player.cargo);
   $('cargo').innerHTML=`<span class="ttl">MY LORRY</span><span class="cash">💰 RM ${fmt(G.money.you)}</span>
     <span class="cg ${ld<6?'empty':''}">🚚 <span class="lbl">Stock </span><b>${ld}/${CAP}</b></span>`+PRODS.map(k=>`<span class="cg ${player.cargo[k]?'':'empty'}">${cyl(k,player.cargo[k])}</span>`).join('');
@@ -726,9 +754,7 @@ function closeModal(){$('modalWrap').classList.add('hidden')}
 
 function endGame(){
   G.over=true;G.running=false;hideOffer();updateHud();
-  const rows=Object.entries(COMPANIES).map(([k,c])=>{const l=lorries.find(l=>l.co===k);
-      return {k,...c,n:customers.filter(x=>x.owner===k).length,m:G.money[k],stock:costOf(l.cargo)}})
-    .map(r=>({...r,score:Math.round(r.m+r.stock+r.n*100)})).sort((a,b)=>b.score-a.score);
+  const rows=liveScores();
   const rank=rows.findIndex(r=>r.k==='you')+1;
   SFX.update(false,false,0);SFX.fanfare(rank===1);
   modal(`<h2>${rank===1?'🏆 Green Gas wins the town!':rank===2?'🥈 So close!':'📉 The rivals out-drove you'}</h2>
