@@ -95,7 +95,9 @@ button{touch-action:manipulation}
 @media (orientation:landscape) and (max-height:520px){
   .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:3px 8px;align-content:start;max-width:none;padding:3px 8px 4px}
   #hud{grid-column:1;grid-row:1;margin:0;flex-wrap:nowrap}
-  #board{grid-column:2;grid-row:1;margin:0;flex-wrap:nowrap;overflow-x:auto;gap:3px;justify-content:flex-end;scrollbar-width:none}
+  #board{grid-column:2;grid-row:1;margin:0;flex-wrap:nowrap;overflow-x:auto;gap:3px;justify-content:flex-start;scrollbar-width:none}
+  .gap{display:none}
+  .lb.me{order:-1}
   #cargo{grid-column:1;grid-row:2;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;font-size:11px;padding:3px 6px;gap:3px;border-width:1.5px}
   #orders{grid-column:2;grid-row:2;margin:0;display:flex;gap:6px;align-items:center;font-size:11px;padding:3px 6px;border-width:1.5px}
   #orders .hd{margin:0;flex:0 0 auto}
@@ -344,14 +346,24 @@ function weightedType(){let tot=0;for(const k in TYPES)tot+=TYPES[k].w;let r=Mat
 function newGame(){
   G={spent:0,time:GAME_TIME,mkt:300,running:false,over:false,elapsed:0,money:{you:START_CASH,blue:START_CASH,yellow:START_CASH,red:START_CASH},profit:{you:0,blue:0,yellow:0,red:0}};
   customers=[]; const usedDoor=new Set(); const nameIdx={};
-  if(mobileMap()){W=13;H=17}else{W=25;H=17}
+  if(mobileMap()){
+    // build the town to the shape of the free screen area, so it fills the screen (portrait = tall town, sideways = wide town)
+    // pick the block count that covers the most screen while tiles stay big enough to tap
+    const [aw,ah]=freeArea();let best=null;
+    for(let bw=3;bw<=9;bw++)for(let bh=3;bh<=9;bh++){
+      const w=4*bw+1,h=4*bh+1,t=Math.min(aw/w,ah/h);if(t<19&&!(bw===3&&bh===3))continue;
+      const score=(w*h*t*t)/(aw*ah)+Math.min(t,30)/100;
+      if(!best||score>best.score)best={w,h,score};
+    }
+    W=best.w;H=best.h;
+  }else{W=25;H=17}
   TR=null;
   const BW=(W-1)/4,BH=(H-1)/4;
   depot={bx:Math.floor(BW/2),by:Math.floor(BH/2)}; depot.door={x:4*depot.bx+2,y:4*depot.by}; usedDoor.add(key(depot.door.x,depot.door.y));
   for(let by=0;by<BH;by++)for(let bx=0;bx<BW;bx++){
     if(bx===depot.bx&&by===depot.by)continue;
     const sides=shuffle([{dx:1,dy:0,ox:1,oy:-1},{dx:1,dy:2,ox:1,oy:3},{dx:0,dy:1,ox:-1,oy:1},{dx:2,dy:1,ox:3,oy:1}]);
-    let n=W===13?2:(Math.random()<.6?2:1);
+    let n=BW*BH<=16?2:(Math.random()<.6?2:1);
     for(const s of sides){ if(!n)break;
       const x=4*bx+1+s.dx,y=4*by+1+s.dy,door={x:4*bx+1+s.ox,y:4*by+1+s.oy};
       if(usedDoor.has(key(door.x,door.y)))continue; usedDoor.add(key(door.x,door.y));
@@ -741,6 +753,14 @@ function drawLorry(l){
 
 // ================= HUD =================
 const $=id=>document.getElementById(id);
+function freeArea(){ // free space for the town, in CSS px: [width, height]
+  const st=document.querySelector('.stage');
+  const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
+  const touch=matchMedia('(hover:none),(max-width:700px)').matches;
+  const top=st.getBoundingClientRect().top+scrollY;
+  const fullH=Math.max(200,innerHeight-top-(touch?4:8));
+  return [st.clientWidth, side||!touch?fullH:fullH-72]; // upright phones keep ~72px for the Netlify badge
+}
 function fit(){
   if(W&&customers)applyView();if(!bg&&customers)buildBg();
   const st=document.querySelector('.stage');if(!st)return;
@@ -748,8 +768,7 @@ function fit(){
   const touch=matchMedia('(hover:none),(max-width:700px)').matches;
   const top=st.getBoundingClientRect().top+scrollY;
   const availW=st.clientWidth, fullH=Math.max(200,innerHeight-top-(touch?4:8));
-  // town size: upright phones keep ~72px under the town for the Netlify badge (filled with countryside)
-  const townH=side||!touch?fullH:fullH-72;
+  const townH=freeArea()[1];
   const sz=Math.min(availW/SWt(),townH/SHt());           // CSS px per tile
   const ncw=Math.max(SWt(),Math.floor(availW/sz+1e-6)), nch=Math.max(SHt(),Math.floor(fullH/sz+1e-6));
   let nox=Math.floor((ncw-SWt())/2), noy=side?Math.floor((nch-SHt())/2):0;
@@ -825,7 +844,7 @@ function intro(){
   <table><tr><th>Customer</th><th>Products</th></tr>
   ${Object.values(TYPES).map(t=>`<tr><td>${t.icon} ${t.name}</td><td>${t.prod.map(p=>`<span class="chip">${cyl(p)}</span>`).join(' ')}</td></tr>`).join('')}</table>
   <p class="muted" style="font-size:12px"><b>Drive:</b> tap a customer, the terminal or a road on the map and your lorry drives there automatically. On a computer you can also use arrow keys / WASD.</p>
-  <button class="primary" onclick="SFX.init();SFX.horn();closeModal();G.running=true">Start driving ▶</button>`);
+  <button class="primary" onclick="SFX.init();SFX.horn();closeModal();newGame();updateHud();G.running=true">Start driving ▶</button>`);
 }
 
 // ================= INPUT =================
