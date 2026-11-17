@@ -122,10 +122,11 @@ button{touch-action:manipulation}
 <body>
 <div class="wrap">
   <div id="hud">
-    <div class="brand">🚚 LPG Lorry Rush</div>
+    <div class="brand">🚚<span class="lbl"> LPG Lorry Rush</span></div>
     <div class="stat">⏱️ <b id="sTime">3:00</b></div>
     <span id="sCash" hidden></span>
     <div class="stat">📣 <span class="lbl">Marketing budget </span>RM <b id="sMkt">0</b></div>
+    <button id="restart" title="Restart game" style="padding:4px 10px">↻ Restart</button>
     <button id="mute" title="Sound on/off (M)" style="padding:4px 10px">🔊</button>
   </div>
   <div id="board"></div>
@@ -620,6 +621,7 @@ function draw(){
   }
   // door marker for target
   // requests
+  for(const c of customers)c._bb=null;
   for(const c of customers){if(!c.req)continue;const r=c.req;
     const mine=r.kind==='reorder'&&c.owner==='you';
     if(r.kind==='reorder'&&!mine){ // rival's own order: just a small dot in their colour
@@ -633,6 +635,7 @@ function draw(){
     const px=c.x*T+T/2,py=c.y*T-12;
     const pulse=r.t<5?(Math.sin(performance.now()/90)>0?1:.55):1;
     ctx.globalAlpha=pulse;
+    c._bb={x:px-w/2,y:py-h/2,w,h:h+6};
     ctx.fillStyle=bgc;rr(px-w/2,py-h/2,w,h,7);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
     ctx.fillStyle=fg;ctx.font='900 9px system-ui';ctx.fillText(tag,px,py-8);
     // qty + product pill
@@ -648,6 +651,9 @@ function draw(){
     // door marker
     ctx.fillStyle=bgc;ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.door.x*T+T/2,c.door.y*T+T/2,mine?6:5,0,7);ctx.fill();ctx.stroke();
   }
+  // tap marker
+  if(tapMark&&tapMark.t<.6){tapMark.t+=1/60;const a=1-tapMark.t/.6;ctx.globalAlpha=a;ctx.strokeStyle='#4ade80';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(tapMark.x*T+T/2,tapMark.y*T+T/2,8+tapMark.t*30,0,7);ctx.stroke();ctx.globalAlpha=1}
   // autopilot path
   if(player.path.length){ctx.strokeStyle='#4ade80aa';ctx.lineWidth=3;ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(player.x*T+T/2,player.y*T+T/2);
     for(const [x,y] of player.path)ctx.lineTo(x*T+T/2,y*T+T/2);ctx.stroke();ctx.setLineDash([])}
@@ -687,7 +693,8 @@ function fit(){
   const st=document.querySelector('.stage');if(!st)return;
   const top=st.getBoundingClientRect().top+scrollY;
   const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
-  const availH=Math.max(240,innerHeight-(side?8:top)-8);
+  const touch=matchMedia('(hover:none),(max-width:700px)').matches;
+  const availH=Math.max(240,innerHeight-(side?8:top)-(touch?84:8));
   cv.style.width=Math.min(st.clientWidth,availH*W/H)+'px';cv.style.margin='0 auto';
 }
 addEventListener('resize',fit);addEventListener('orientationchange',()=>setTimeout(fit,300));
@@ -764,22 +771,43 @@ addEventListener('keydown',e=>{
   if(offer){offer.c.cool.you=3;hideOffer()}
   if(shop)hideShop();
 });
+document.getElementById('restart').onclick=()=>{
+  if(G.running&&!G.over&&!confirm('Restart the game? Your current score will be lost.'))return;
+  SFX.init();closeModal();hideOffer();if(shop)hideShop();held.clear();newGame();G.running=true;SFX.horn();toast('🔄 New game started!');
+};
 document.getElementById('mute').onclick=()=>{SFX.init();SFX.setMuted(!SFX.muted)};
 addEventListener('keyup',e=>{const d=KEYMAP[e.key];if(d)held.delete(d)});
 addEventListener('blur',()=>held.clear());
 document.getElementById('orders').addEventListener('pointerdown',e=>{const b=e.target.closest('[data-go]');if(!b||!G.running||offer||shop)return;
   const c=customers[+b.dataset.go],sx=player.moving?player.nx:player.x,sy=player.moving?player.ny:player.y;const p=bfs(sx,sy,c.door.x,c.door.y);if(p)player.path=p});
 offerEl.addEventListener('click',e=>{const s=e.target.closest('[data-shop]');if(s&&!s.disabled){shopAction(s.dataset.shop);return}const b=e.target.closest('[data-offer]');if(b&&!b.disabled)chooseOffer(b.dataset.offer)});
+let tapMark=null;
 cv.addEventListener('pointerdown',e=>{
   if(!G.running||offer||shop)return;
-  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);
-  let tx=x,ty=y;
-  const c=customers.find(c=>c.x===x&&c.y===y);
-  if(c){tx=c.door.x;ty=c.door.y}
-  else if(Math.floor(x/4)===depot.bx&&Math.floor(y/4)===depot.by&&!isRoad(x,y)){tx=depot.door.x;ty=depot.door.y}
-  else if(!isRoad(x,y))return;
+  const r=cv.getBoundingClientRect();
+  const mx=(e.clientX-r.left)/r.width*W*T, my=(e.clientY-r.top)/r.height*H*T; // canvas pixels
+  const pad=10*(W*T)/r.width; // ~10 screen px of extra touch area
+  let tx=null,ty=null;
+  // a) order bubble (YOUR ORDER / NEW / GRAB IT!), most urgent first if bubbles overlap
+  const hits=customers.filter(c=>c._bb&&mx>=c._bb.x-pad&&mx<=c._bb.x+c._bb.w+pad&&my>=c._bb.y-pad&&my<=c._bb.y+c._bb.h+pad);
+  if(hits.length){const c=hits.sort((a,b)=>(a.req?a.req.t:99)-(b.req?b.req.t:99))[0];tx=c.door.x;ty=c.door.y}
+  // b) a customer building or its door (nearest within ~1 tile)
+  if(tx==null){
+    let best=null,bd=1e9;
+    for(const c of customers){const d=Math.hypot(mx-(c.x+.5)*T,my-(c.y+.5)*T);if(d<bd){bd=d;best=c}}
+    const doorD=c=>Math.hypot(mx-(c.door.x+.5)*T,my-(c.door.y+.5)*T);
+    const nearDoor=customers.filter(c=>c.req).find(c=>doorD(c)<T*.7);
+    if(nearDoor){tx=nearDoor.door.x;ty=nearDoor.door.y}
+    else if(best&&bd<T*.85){tx=best.door.x;ty=best.door.y}
+  }
+  // c) the terminal block
+  if(tx==null){const x=Math.floor(mx/T),y=Math.floor(my/T);
+    if(Math.floor(x/4)===depot.bx&&Math.floor(y/4)===depot.by&&!isRoad(x,y)){tx=depot.door.x;ty=depot.door.y}}
+  // d) otherwise the nearest road tile
+  if(tx==null){let bd=1e9;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!isRoad(x,y))continue;const d=Math.hypot(mx-(x+.5)*T,my-(y+.5)*T);if(d<bd){bd=d;tx=x;ty=y}}}
   const sx=player.moving?player.nx:player.x,sy=player.moving?player.ny:player.y;
-  const p=bfs(sx,sy,tx,ty);if(p){player.path=p;if(tx===depot.door.x&&ty===depot.door.y)shopDismissed=false}
+  const p=bfs(sx,sy,tx,ty);
+  if(p){player.path=p;tapMark={x:tx,y:ty,t:0};if(tx===depot.door.x&&ty===depot.door.y)shopDismissed=false}
 });
 
 document.getElementById('legendCyl').innerHTML=PRODS.map(k=>cyl(k)+' '+PNAME[k]+(k==='C14'?' (subsidised, households only)':'')).join(' · ')+'.';
