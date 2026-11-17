@@ -112,7 +112,7 @@ button{touch-action:manipulation}
 }
 /* any touch screen: offer & terminal panel slides up from the bottom */
 @media (hover:none),(max-width:700px){
-  #offer{position:fixed;left:0;right:0;bottom:0;transform:none;width:auto;border-radius:16px 16px 0 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));max-height:75vh;overflow:auto;z-index:15}
+  #offer{position:fixed;left:0;right:0;bottom:0;transform:none;width:auto;border-radius:16px 16px 0 0;padding:10px 12px calc(78px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;z-index:15}
   .shop button{padding:6px 14px;font-size:16px}
 }
 @media (orientation:landscape) and (max-height:520px){
@@ -135,6 +135,8 @@ button{touch-action:manipulation}
 .good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.muted{color:var(--muted)}
 @media (max-width:700px){#toast{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));height:auto;font-size:13px;padding:6px 12px}}
 @media (max-width:360px){.gap{display:none}}
+.shopBtns{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:6px;margin:8px 0 4px}
+.shopBtns button{padding:10px 6px;font-weight:700}
 </style>
 </head>
 <body>
@@ -487,14 +489,14 @@ function renderShop(){
   const cur=loadOf(player.cargo),add=PRODS.reduce((s,k)=>s+shop.buy[k],0),cost=shopCost();
   offerEl.style.display='block';
   offerEl.innerHTML=`<h3>⛽ LPG Terminal – buy stock</h3>
-   <div class="muted">Lorry: <b>${cur+add}/${CAP}</b> cylinders after purchase · Cash RM${fmt(G.money.you)}</div>
+   <div class="muted">Lorry: <b>${cur+add}/${CAP}</b> cylinders after purchase · Cash RM${fmt(G.money.you)} · Total: <b class="${cost>G.money.you?'bad':'good'}">RM${fmt(cost)}</b></div>
+   <div class="shopBtns">
+     <button class="primary" data-shop="buy" ${cost>G.money.you||!add?'disabled':''}>Buy & go</button>
+     <button data-shop="fill">Fill evenly</button><button data-shop="clear">Clear</button><button data-shop="leave">Leave</button></div>
    <table class="shop">${PRODS.map(k=>`<tr><td>${cyl(k)}<br><small class="muted">buy RM${PRICE[k].buy} · sell RM${PRICE[k].sell}</small></td>
      <td class="muted">on board ${player.cargo[k]}</td>
      <td style="white-space:nowrap"><button data-shop="minus:${k}">−</button> <b style="display:inline-block;width:22px;text-align:center">${shop.buy[k]}</b> <button data-shop="plus:${k}">+</button></td></tr>`).join('')}</table>
-   <div style="margin:6px 0">Total: <b class="${cost>G.money.you?'bad':''}">RM${fmt(cost)}</b></div>
-   <div style="display:flex;gap:6px;flex-wrap:wrap">
-     <button class="primary" data-shop="buy" ${cost>G.money.you||!add?'disabled':''}>Buy & go (Enter)</button>
-     <button data-shop="fill">Fill evenly</button><button data-shop="clear">Clear</button><button data-shop="leave">Leave (Esc)</button></div>`;
+`;
 }
 function shopAction(a){
   if(!shop)return;
