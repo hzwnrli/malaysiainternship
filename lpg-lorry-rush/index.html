@@ -350,7 +350,11 @@ function newGame(){
     // build the town to the shape of the free screen area, so it fills the screen (portrait = tall town, sideways = wide town)
     // pick the block count that covers the most screen while tiles stay big enough to tap
     const [aw,ah]=freeArea();let best=null;
-    for(let bw=3;bw<=9;bw++)for(let bh=3;bh<=9;bh++){
+    if(aw>ah){ // sideways: 2 rows x 7 blocks (14 blocks) with big, easy-to-tap tiles; fewer columns only on very small screens
+      let bw=7;while(bw>3&&aw/(4*bw+1)<22)bw--;
+      best={w:4*bw+1,h:9};
+    }
+    else for(let bw=3;bw<=9;bw++)for(let bh=3;bh<=9;bh++){
       const w=4*bw+1,h=4*bh+1,t=Math.min(aw/w,ah/h);if(t<19&&!(bw===3&&bh===3))continue;
       const score=(w*h*t*t)/(aw*ah)+Math.min(t,30)/100;
       if(!best||score>best.score)best={w,h,score};
